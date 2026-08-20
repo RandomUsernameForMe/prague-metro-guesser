@@ -4,24 +4,48 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Metro Guesser — kde vede pražské metro?</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;800&family=Anton&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main id="stage">
-    <div id="tiles"></div>
-    <svg id="draw"></svg>
-    <header id="hud">
-      <strong id="hud-station">…</strong>
-      <span id="hud-round"></span>
-      <span id="hud-score"></span>
-    </header>
-    <div id="controls">
-      <button id="clear" class="btn-ghost">Smazat</button>
-      <button id="confirm" class="btn-primary" disabled>Potvrdit</button>
-    </div>
-    <div id="overlay" hidden></div>
-    <footer id="attribution">snímky © ČÚZK / Esri · data © přispěvatelé OpenStreetMap</footer>
-  </main>
+  <div id="app">
+    <main id="stage">
+      <div id="tiles"></div>
+      <svg id="draw"></svg>
+      <p id="hint" hidden></p>
+      <div id="overlay" hidden></div>
+      <footer id="attribution">ortofoto © ČÚZK · data © OpenStreetMap</footer>
+    </main>
+
+    <aside id="panel">
+      <div class="brand">
+        <span class="brand-mark">M</span>
+        <span class="brand-name">Metro<br>Guesser</span>
+      </div>
+
+      <div class="task">
+        <span id="line-badges" class="badges"></span>
+        <h1 id="station-name">—</h1>
+        <p id="round-label" class="label"></p>
+      </div>
+
+      <ol id="progress" class="progress"></ol>
+
+      <div class="score">
+        <span class="label">skóre</span>
+        <strong id="score-value">0</strong>
+      </div>
+
+      <div id="controls">
+        <button id="clear" class="btn btn-ghost">Smazat</button>
+        <button id="confirm" class="btn btn-primary" disabled>Potvrdit</button>
+      </div>
+
+      <button id="home" class="link-btn" hidden>← zpět na začátek</button>
+    </aside>
+  </div>
   <script type="module" src="app.mjs"></script>
 </body>
 </html>

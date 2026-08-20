@@ -1,13 +1,14 @@
 import { isoWeek, weeklyChallenge, roundViewport } from './shared/seed.mjs';
 import { scoreRound } from './shared/scoring.mjs';
-import { renderTiles, pxToLatLng, latLngToPx } from './tiles.mjs';
+import { renderTiles, prefetchTiles, pxToLatLng, latLngToPx } from './tiles.mjs';
 
 const $ = id => document.getElementById(id);
-const stage = $('stage'), tilesEl = $('tiles'), svg = $('draw'), overlay = $('overlay');
+const stage = $('stage'), tilesEl = $('tiles'), svg = $('draw'), overlay = $('overlay'), hintEl = $('hint');
 
 const stations = await (await fetch('stations.json')).json();
 const week = isoWeek(new Date());
 const playedKey = `pmg-played-${week}`;
+const hintKey = 'pmg-hint-seen';
 
 let mode = 'weekly'; // 'weekly' | 'training'
 let rounds = [], roundIdx = 0, totalScore = 0;
@@ -30,8 +31,8 @@ function redraw(extra = '') {
   // jen číselné souřadnice z kliků — žádná externí data
   const markup =
     (drawn.length
-      ? `<polyline points="${pts}" fill="none" stroke="var(--line)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>` +
-        drawn.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="5" fill="var(--line)"/>`).join('')
+      ? `<polyline points="${pts}" fill="none" stroke="var(--draw)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>` +
+        drawn.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="5" fill="var(--draw)"/>`).join('')
       : '') + extra;
   svg.replaceChildren(...parseSvg(markup));
   $('confirm').disabled = drawn.length < 2;
@@ -39,6 +40,7 @@ function redraw(extra = '') {
 
 svg.addEventListener('pointerdown', e => {
   if (!overlay.hidden) return;
+  hideHint();
   drawing = true;
   svg.setPointerCapture(e.pointerId);
   drawn.push([e.offsetX, e.offsetY]);
@@ -55,38 +57,92 @@ svg.addEventListener('pointermove', e => {
 svg.addEventListener('pointerup', () => { drawing = false; });
 
 $('clear').onclick = () => { drawn = []; redraw(); };
+$('home').onclick = () => showIntro();
+
+function hideHint() {
+  hintEl.hidden = true;
+  localStorage.setItem(hintKey, '1');
+}
+
+// ---------- panel ----------
+function paintPanel() {
+  const st = rounds[roundIdx].station;
+  document.documentElement.style.setProperty('--accent', `var(--${st.lines[0].toLowerCase()})`);
+  document.documentElement.style.setProperty('--on-accent', st.lines[0] === 'B' ? '#1a1400' : '#fff');
+  $('station-name').textContent = st.name;
+  $('line-badges').replaceChildren(...st.lines.map(l => {
+    const b = document.createElement('span');
+    b.className = `badge ${l}`;
+    b.textContent = l;
+    return b;
+  }));
+  $('round-label').textContent = mode === 'weekly'
+    ? `kolo ${roundIdx + 1} z ${rounds.length} · týden ${week}`
+    : 'trénink · bez zápisu do žebříčku';
+  $('progress').replaceChildren(...Array.from({ length: mode === 'weekly' ? rounds.length : 1 }, (_, i) => {
+    const li = document.createElement('li');
+    if (i < roundIdx) li.className = 'done';
+    else if (i === roundIdx) li.className = 'now';
+    return li;
+  }));
+  $('home').hidden = mode !== 'training';
+}
+
+// krátký dopočet skóre, ať číslo neskočí
+function setScore(to) {
+  const el = $('score-value');
+  const from = Number(el.textContent.replace(/\s/g, '')) || 0;
+  const start = performance.now();
+  const tick = now => {
+    const t = Math.min(1, (now - start) / 500);
+    const v = Math.round(from + (to - from) * (1 - (1 - t) ** 3));
+    el.textContent = v.toLocaleString('cs');
+    if (t < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
 
 // ---------- kola ----------
 function startRound() {
   drawn = []; redraw();
   renderTiles(tilesEl, vp(), sizePx());
-  $('hud-station').textContent = rounds[roundIdx].station.name;
-  $('hud-round').textContent = mode === 'weekly' ? `${roundIdx + 1}/${rounds.length}` : 'trénink';
-  $('hud-score').textContent = mode === 'weekly' ? `${totalScore} b.` : '';
+  paintPanel();
   overlay.hidden = true;
+  $('clear').disabled = false;
+  document.body.dataset.phase = 'play';
+  if (!localStorage.getItem(hintKey)) {
+    hintEl.textContent = 'Klikni nebo táhni přes snímek — nakresli, kudy stanice vede pod zemí.';
+    hintEl.hidden = false;
+  }
+  // snímek dalšího kola natáhni dopředu, ať je přepnutí okamžité
+  const next = mode === 'weekly' ? rounds[roundIdx + 1] : null;
+  if (next) prefetchTiles(roundViewport(next), sizePx());
 }
 
 $('confirm').onclick = () => {
   const s = sizePx();
+  const station = rounds[roundIdx].station;
   const line = drawn.map(([x, y]) => pxToLatLng(x, y, vp(), s));
-  const { d, score } = scoreRound(line, rounds[roundIdx].station);
-  if (mode === 'weekly') { lines.push(line); totalScore += score; }
-  // reveal skutečných os (souřadnice = čísla z vlastních dat)
-  const axesSvg = rounds[roundIdx].station.axes.map(axis => {
+  const { d, score } = scoreRound(line, station);
+  if (mode === 'weekly') { lines.push(line); totalScore += score; setScore(totalScore); }
+  hideHint();
+  // reveal skutečných os v barvě linky (souřadnice = čísla z vlastních dat)
+  const axesSvg = station.axes.map(axis => {
     const pts = axis.map(([lat, lng]) => latLngToPx(lat, lng, vp(), s).join(',')).join(' ');
-    return `<polyline points="${pts}" fill="none" stroke="var(--truth)" stroke-width="5" stroke-linecap="round" stroke-dasharray="1000" stroke-dashoffset="1000" style="animation: reveal 1s forwards"/>`;
+    return `<polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="5" stroke-linecap="round" stroke-dasharray="1000" stroke-dashoffset="1000" style="animation: reveal 1s forwards"/>`;
   }).join('');
   redraw(axesSvg + `<style>@keyframes reveal { to { stroke-dashoffset: 0; } }</style>`);
-  $('hud-score').textContent = mode === 'weekly' ? `${totalScore} b.` : '';
-  const name = rounds[roundIdx].station.name;
-  setTimeout(() => showPanel(`
+  setTimeout(() => showCard(`
+    <p class="label">${mode === 'weekly' ? `kolo ${roundIdx + 1} z ${rounds.length}` : 'trénink'}</p>
     <h2></h2>
     <div class="big">+${score}</div>
-    <p class="muted">průměrná odchylka ${Math.round(d)} m</p>
-    <button class="btn-primary" id="next">${nextLabel()}</button>
-  `, panel => {
-    panel.querySelector('h2').textContent = name;
+    <p>Průměrná odchylka <strong>${Math.round(d)} m</strong> od skutečné osy stanice.</p>
+    <button class="btn btn-primary" id="next">${nextLabel()}</button>
+    ${mode === 'training' ? '<button class="link-btn" id="back">← zpět na začátek</button>' : ''}
+  `, card => {
+    card.querySelector('h2').textContent = station.name;
     $('next').onclick = advance;
+    if (mode === 'training') $('back').onclick = () => showIntro();
   }), 1200);
 };
 
@@ -101,14 +157,20 @@ function advance() {
 
 // ---------- konec + odeslání ----------
 function finish() {
-  showPanel(`
-    <h2>Hotovo!</h2>
-    <div class="big">${totalScore} b.</div>
-    <p>z ${rounds.length * 1000} možných</p>
+  $('progress').replaceChildren(...Array.from({ length: rounds.length }, () => {
+    const li = document.createElement('li');
+    li.className = 'done';
+    return li;
+  }));
+  showCard(`
+    <p class="label">týden ${week} · hotovo</p>
+    <h2>Konečné skóre</h2>
+    <div class="big">${totalScore.toLocaleString('cs')}</div>
+    <p>z ${(rounds.length * 1000).toLocaleString('cs')} možných</p>
     <input id="nick" maxlength="16" placeholder="přezdívka (3–16 znaků)">
     <p class="error" id="submit-err"></p>
-    <button class="btn-primary" id="submit">Zapsat na leaderboard</button>
-    <button class="btn-ghost" id="skip">Přeskočit</button>
+    <button class="btn btn-primary" id="submit">Zapsat do žebříčku</button>
+    <button class="link-btn" id="skip">přeskočit</button>
   `, () => {
     $('submit').onclick = submitScore;
     $('skip').onclick = () => showLeaderboard();
@@ -137,25 +199,38 @@ async function submitScore() {
 }
 
 async function showLeaderboard(me) {
-  showPanel(`
+  showCard(`
+    <p class="label">žebříček</p>
     <h2>Týden ${week}</h2>
-    <div id="lb-list"><p class="muted">Načítám…</p></div>
-    <button class="btn-ghost" id="train">Trénink</button>
-  `, () => { $('train').onclick = startTraining; });
+    <div id="lb-list"><p>Načítám…</p></div>
+    <button class="btn btn-ghost" id="train">Trénovat dál</button>
+    <button class="link-btn" id="back">← zpět na začátek</button>
+  `, () => {
+    $('train').onclick = startTraining;
+    $('back').onclick = () => showIntro();
+  });
   const box = $('lb-list');
   try {
     const { entries } = await (await fetch(`/api/leaderboard?week=${week}`)).json();
     if (!entries.length) { box.firstElementChild.textContent = 'Tenhle týden zatím nikdo nehrál. Jsi první!'; return; }
     const ol = document.createElement('ol');
-    for (const e of entries) {
+    ol.className = 'board';
+    entries.forEach((e, i) => {
       const li = document.createElement('li');
-      li.textContent = `${e.nick} — ${e.score} b.`; // nick je nedůvěryhodný → jen textContent
       if (e.nick === me) li.className = 'me';
+      const rank = document.createElement('span');
+      rank.className = 'rank';
+      rank.textContent = `${i + 1}.`;
+      const nick = document.createElement('span');
+      nick.textContent = e.nick; // nick je nedůvěryhodný → jen textContent
+      const score = document.createElement('span');
+      score.textContent = `${e.score.toLocaleString('cs')} b.`;
+      li.append(rank, nick, score);
       ol.appendChild(li);
-    }
+    });
     box.replaceChildren(ol);
   } catch {
-    box.firstElementChild.textContent = 'Leaderboard se nepodařilo načíst.';
+    box.firstElementChild.textContent = 'Žebříček se nepodařilo načíst.';
   }
 }
 
@@ -175,39 +250,59 @@ function startWeekly() {
   mode = 'weekly';
   rounds = weeklyChallenge(week, stations);
   roundIdx = 0; totalScore = 0; lines = [];
+  setScore(0); $('score-value').textContent = '0';
   startRound();
 }
 
 // ---------- helpers ----------
-function showPanel(staticHtml, wire) {
-  const panel = document.createElement('div');
-  panel.className = 'panel';
-  panel.append(...parseHtml(staticHtml));
-  overlay.replaceChildren(panel);
+function showCard(staticHtml, wire) {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.append(...parseHtml(staticHtml));
+  overlay.replaceChildren(card);
   overlay.hidden = false;
-  wire?.(panel);
+  hintEl.hidden = true;
+  // overlay kryje jen mapu — tlačítka v panelu se musí zamknout ručně
+  $('confirm').disabled = true;
+  $('clear').disabled = true;
+  wire?.(card);
+}
+
+// ---------- úvod + tutoriál ----------
+function showIntro() {
+  const played = localStorage.getItem(playedKey);
+  document.body.dataset.phase = 'intro';
+  $('station-name').textContent = 'Kde vede metro?';
+  $('line-badges').replaceChildren();
+  $('round-label').textContent = 'týdenní výzva o 10 stanicích';
+  $('progress').replaceChildren();
+  $('home').hidden = true;
+  $('confirm').disabled = true;
+  showCard(`
+    <p class="label">pražské metro · týden ${week}</p>
+    <h2>Metro Guesser</h2>
+    <ol class="steps">
+      <li><b>1</b><div>Dostaneš letecký snímek 600 × 600 m a jméno stanice.<br><span>Stanice je někde uvnitř, ale pod zemí ji nevidíš.</span></div></li>
+      <li><b>2</b><div>Nakresli čáru, kudy podle tebe vede nástupiště.<br><span>Klikáním body, nebo táhni prstem či myší.</span></div></li>
+      <li><b>3</b><div>Potvrdíš a uvidíš skutečnou osu kolejí.<br><span>Čím blíž jsi trefil, tím víc bodů — max 1000 za kolo.</span></div></li>
+    </ol>
+    ${played
+      ? `<p>Týdenní výzvu už jsi tenhle týden odehrál jako <strong id="played-nick"></strong>.</p>
+         <button class="btn btn-primary" id="lb">Žebříček</button>
+         <button class="btn btn-ghost" id="train">Trénink</button>`
+      : `<button class="btn btn-primary" id="play">Hrát týdenní výzvu</button>
+         <button class="btn btn-ghost" id="train">Trénink bez zápisu</button>`}
+  `, card => {
+    if (played) {
+      card.querySelector('#played-nick').textContent = played;
+      $('lb').onclick = () => showLeaderboard(played);
+    } else {
+      $('play').onclick = startWeekly;
+    }
+    $('train').onclick = startTraining;
+  });
 }
 
 // ---------- start ----------
 renderTiles(tilesEl, { lat: 50.0755, lng: 14.4303 }, sizePx());
-if (localStorage.getItem(playedKey)) {
-  showPanel(`
-    <h2>Metro Guesser</h2>
-    <p>Týdenní výzvu ${week} už jsi odehrál.</p>
-    <button class="btn-primary" id="lb">Leaderboard</button>
-    <button class="btn-ghost" id="train">Trénink</button>
-  `, () => {
-    $('lb').onclick = () => showLeaderboard(localStorage.getItem(playedKey));
-    $('train').onclick = startTraining;
-  });
-} else {
-  showPanel(`
-    <h2>Metro Guesser</h2>
-    <p>Uvidíš letecký snímek a jméno stanice metra. Nakresli čárou, kudy pod zemí vede. 10 stanic, jeden pokus týdně.</p>
-    <button class="btn-primary" id="play">Hrát týdenní výzvu</button>
-    <button class="btn-ghost" id="train">Trénink</button>
-  `, () => {
-    $('play').onclick = startWeekly;
-    $('train').onclick = startTraining;
-  });
-}
+showIntro();
