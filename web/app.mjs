@@ -12,8 +12,14 @@ const hintKey = 'pmg-hint-seen';
 
 let mode = 'weekly'; // 'weekly' | 'training'
 let rounds = [], roundIdx = 0, totalScore = 0;
-let drawn = [], drawing = false; // drawn: [[px,py],...] v px stage
-let lines = []; // tahy pro odeslání, [[lat,lng],...] per kolo
+// stanice metra je rovné nástupiště → hráč kreslí úsečky, jednu na každou linku stanice
+let segs = [];          // hotové úsečky v px stage: [[[x,y],[x,y]], ...]
+let anchor = null;      // začátek rozkreslené úsečky
+let cursor = null;      // její aktuální konec (náhled)
+let pressing = false;
+let lines = [];         // tahy pro odeslání, [[[lat,lng],[lat,lng]], ...] per kolo
+
+const required = () => rounds[roundIdx].station.lines.length;
 
 const sizePx = () => stage.clientWidth;
 const vp = () => roundViewport(rounds[roundIdx]);
@@ -25,38 +31,52 @@ const parseSvg = markup => [
     `<svg xmlns="http://www.w3.org/2000/svg">${markup}</svg>`, 'image/svg+xml').documentElement.childNodes,
 ];
 
-// ---------- kreslení ----------
+// ---------- kreslení úseček ----------
+const segMarkup = ([[x1, y1], [x2, y2]], preview = false) =>
+  `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--draw)" stroke-width="4"
+     stroke-linecap="round"${preview ? ' stroke-dasharray="8 6" opacity="0.85"' : ''}/>` +
+  `<circle cx="${x1}" cy="${y1}" r="5" fill="var(--draw)"/><circle cx="${x2}" cy="${y2}" r="5" fill="var(--draw)"/>`;
+
 function redraw(extra = '') {
-  const pts = drawn.map(p => p.join(',')).join(' ');
   // jen číselné souřadnice z kliků — žádná externí data
-  const markup =
-    (drawn.length
-      ? `<polyline points="${pts}" fill="none" stroke="var(--draw)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>` +
-        drawn.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="5" fill="var(--draw)"/>`).join('')
-      : '') + extra;
+  const markup = segs.map(s => segMarkup(s)).join('')
+    + (anchor && cursor ? segMarkup([anchor, cursor], true) : '')
+    + extra;
   svg.replaceChildren(...parseSvg(markup));
-  $('confirm').disabled = drawn.length < 2;
+  $('confirm').disabled = segs.length < required();
+  updateTask();
+}
+
+function commitSegment(a, b) {
+  if (segs.length >= required()) segs[segs.length - 1] = [a, b]; // další tah přepíše poslední úsečku
+  else segs.push([a, b]);
 }
 
 svg.addEventListener('pointerdown', e => {
   if (!overlay.hidden) return;
   hideHint();
-  drawing = true;
   svg.setPointerCapture(e.pointerId);
-  drawn.push([e.offsetX, e.offsetY]);
+  const p = [e.offsetX, e.offsetY];
+  if (anchor) { commitSegment(anchor, p); anchor = cursor = null; }  // druhý klik dokončí úsečku
+  else { anchor = p; cursor = p; pressing = true; }
   redraw();
 });
 svg.addEventListener('pointermove', e => {
-  if (!drawing) return;
-  const [lx, ly] = drawn.at(-1);
-  if (Math.hypot(e.offsetX - lx, e.offsetY - ly) > 12 && drawn.length < 200) {
-    drawn.push([e.offsetX, e.offsetY]);
-    redraw();
-  }
+  if (!anchor) return;
+  cursor = [e.offsetX, e.offsetY];
+  redraw();
 });
-svg.addEventListener('pointerup', () => { drawing = false; });
+svg.addEventListener('pointerup', () => {
+  // tah = hotová úsečka; pouhé kliknutí nechá začátek viset a čeká na druhý klik
+  if (pressing && anchor && cursor && Math.hypot(cursor[0] - anchor[0], cursor[1] - anchor[1]) > 10) {
+    commitSegment(anchor, cursor);
+    anchor = cursor = null;
+  }
+  pressing = false;
+  redraw();
+});
 
-$('clear').onclick = () => { drawn = []; redraw(); };
+$('clear').onclick = () => { segs = []; anchor = cursor = null; redraw(); };
 $('home').onclick = () => showIntro();
 
 function hideHint() {
@@ -65,6 +85,17 @@ function hideHint() {
 }
 
 // ---------- panel ----------
+// zadání kola + kolik úseček ještě chybí
+function updateTask() {
+  if (!rounds.length) return;
+  const st = rounds[roundIdx].station;
+  const where = mode === 'weekly' ? `kolo ${roundIdx + 1} z ${rounds.length}` : 'trénink';
+  const task = st.lines.length > 1
+    ? `přestup ${st.lines.join('+')} · nakresli ${st.lines.length} úsečky (${segs.length}/${st.lines.length})`
+    : 'nakresli osu nástupiště jednou úsečkou';
+  $('round-label').textContent = `${where} · ${task}`;
+}
+
 function paintPanel() {
   const st = rounds[roundIdx].station;
   document.documentElement.style.setProperty('--accent', `var(--${st.lines[0].toLowerCase()})`);
@@ -76,9 +107,7 @@ function paintPanel() {
     b.textContent = l;
     return b;
   }));
-  $('round-label').textContent = mode === 'weekly'
-    ? `kolo ${roundIdx + 1} z ${rounds.length} · týden ${week}`
-    : 'trénink · bez zápisu do žebříčku';
+  updateTask();
   $('progress').replaceChildren(...(mode === 'weekly'
     ? Array.from({ length: rounds.length }, (_, i) => {
       const li = document.createElement('li');
@@ -106,14 +135,15 @@ function setScore(to) {
 
 // ---------- kola ----------
 function startRound() {
-  drawn = []; redraw();
+  segs = []; anchor = cursor = null;
+  redraw();
   renderTiles(tilesEl, vp(), sizePx());
   paintPanel();
   overlay.hidden = true;
   $('clear').disabled = false;
   document.body.dataset.phase = mode; // 'weekly' | 'training' — v tréninku se skóre nesbírá
   if (!localStorage.getItem(hintKey)) {
-    hintEl.textContent = 'Klikni nebo táhni přes snímek — nakresli, kudy stanice vede pod zemí.';
+    hintEl.textContent = 'Táhni přes snímek (nebo klikni dvakrát) — nakresli přímou osu nástupiště.';
     hintEl.hidden = false;
   }
   // snímek dalšího kola natáhni dopředu, ať je přepnutí okamžité
@@ -124,21 +154,24 @@ function startRound() {
 $('confirm').onclick = () => {
   const s = sizePx();
   const station = rounds[roundIdx].station;
-  const line = drawn.map(([x, y]) => pxToLatLng(x, y, vp(), s));
-  const { d, score } = scoreRound(line, station);
-  if (mode === 'weekly') { lines.push(line); totalScore += score; setScore(totalScore); }
+  const segments = segs.map(seg => seg.map(([x, y]) => pxToLatLng(x, y, vp(), s)));
+  const { d, score, perLine } = scoreRound(segments, station);
+  if (mode === 'weekly') { lines.push(segments); totalScore += score; setScore(totalScore); }
   hideHint();
-  // reveal skutečných os v barvě linky (souřadnice = čísla z vlastních dat)
+  // reveal skutečných os, každá v barvě své linky (souřadnice = čísla z vlastních dat)
   const axesSvg = station.axes.map(axis => {
-    const pts = axis.map(([lat, lng]) => latLngToPx(lat, lng, vp(), s).join(',')).join(' ');
-    return `<polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="5" stroke-linecap="round" stroke-dasharray="1000" stroke-dashoffset="1000" style="animation: reveal 1s forwards"/>`;
+    const pts = axis.pts.map(([lat, lng]) => latLngToPx(lat, lng, vp(), s).join(',')).join(' ');
+    return `<polyline points="${pts}" fill="none" stroke="var(--${axis.line.toLowerCase()})" stroke-width="5" stroke-linecap="round" stroke-dasharray="1000" stroke-dashoffset="1000" style="animation: reveal 1s forwards"/>`;
   }).join('');
   redraw(axesSvg + `<style>@keyframes reveal { to { stroke-dashoffset: 0; } }</style>`);
+  const detail = perLine.length > 1
+    ? perLine.map(r => `linka ${r.line}: ${Math.round(r.d)} m`).join(' · ')
+    : `odchylka ${Math.round(d)} m od skutečné osy`;
   setTimeout(() => showCard(`
     <p class="label">${mode === 'weekly' ? `kolo ${roundIdx + 1} z ${rounds.length}` : 'trénink'}</p>
     <h2></h2>
     <div class="big">+${score}</div>
-    <p>Průměrná odchylka <strong>${Math.round(d)} m</strong> od skutečné osy stanice.</p>
+    <p>${detail}</p>
     <button class="btn btn-primary" id="next">${nextLabel()}</button>
     ${mode === 'training' ? '<button class="link-btn" id="back">← zpět na začátek</button>' : ''}
   `, card => {
@@ -285,7 +318,7 @@ function showIntro() {
     <h2>Metro Guesser</h2>
     <ol class="steps">
       <li><b>1</b><div>Dostaneš letecký snímek 600 × 600 m a jméno stanice.<br><span>Stanice je někde uvnitř, ale pod zemí ji nevidíš.</span></div></li>
-      <li><b>2</b><div>Nakresli čáru, kudy podle tebe vede nástupiště.<br><span>Klikáním body, nebo táhni prstem či myší.</span></div></li>
+      <li><b>2</b><div>Nakresli úsečku, kudy vede nástupiště.<br><span>Táhni prstem či myší, nebo klikni na začátek a konec. U přestupní stanice kreslíš úsečku pro každou linku.</span></div></li>
       <li><b>3</b><div>Potvrdíš a uvidíš skutečnou osu kolejí.<br><span>Čím blíž jsi trefil, tím víc bodů — max 1000 za kolo.</span></div></li>
     </ol>
     ${played

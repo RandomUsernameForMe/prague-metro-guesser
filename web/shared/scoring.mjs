@@ -38,10 +38,31 @@ export function symmetricDistance(player, axis) {
   return (meanMinDist(player, axis) + meanMinDist(axis, player)) / 2;
 }
 
-// playerLatLng: [[lat,lng],...], station: {lat,lng,axes:[[[lat,lng],...],...]}
-export function scoreRound(playerLatLng, station) {
+const scoreFromDistance = d => Math.round(1000 * Math.exp(-d / 85));
+
+// všechna pořadí prvků (pro 1–2 linky triviální, víc jich v Praze není)
+function permutations(items) {
+  if (items.length <= 1) return [items];
+  return items.flatMap((it, i) =>
+    permutations([...items.slice(0, i), ...items.slice(i + 1)]).map(rest => [it, ...rest]));
+}
+
+// segments: [[[lat,lng],[lat,lng]], ...] — jedna úsečka na linku stanice
+// station: {lat, lng, lines: ['A','B'], axes: [{line, pts}]}
+export function scoreRound(segments, station) {
   const toM = pts => pts.map(([lat, lng]) => toLocalMeters(lat, lng, station));
-  const player = toM(playerLatLng);
-  const d = Math.min(...station.axes.map(axis => symmetricDistance(player, toM(axis))));
-  return { d, score: Math.round(1000 * Math.exp(-d / 85)) };
+  const segs = segments.map(toM);
+  const axesOf = line => station.axes.filter(a => a.line === line).map(a => toM(a.pts));
+
+  // hráč nemusí vědět, která úsečka patří které lince — vezmi pro něj nejlepší přiřazení
+  let best = null;
+  for (const order of permutations(station.lines)) {
+    const perLine = order.map((line, i) => ({
+      line,
+      d: Math.min(...axesOf(line).map(axis => symmetricDistance(segs[i], axis))),
+    }));
+    const d = perLine.reduce((s, r) => s + r.d, 0) / perLine.length;
+    if (!best || d < best.d) best = { d, perLine };
+  }
+  return { d: best.d, score: scoreFromDistance(best.d), perLine: best.perLine };
 }

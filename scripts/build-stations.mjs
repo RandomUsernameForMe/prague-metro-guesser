@@ -36,20 +36,24 @@ for (const n of nodes) {
   byName.get(name).push(n);
 }
 
+const distTo = (lat, lng, n) => Math.hypot(...toLocalMeters(lat, lng, { lat: n.lat, lng: n.lon }));
+
 // ponytail: clipping po vrcholech (bez interpolace hranice) — track ways mají husté nody, stačí
 function clipAxes(stationNodes, way) {
   const axes = [];
   let run = [];
   for (const g of way.geometry) {
-    const inRange = stationNodes.some(n => {
-      const [x, y] = toLocalMeters(g.lat, g.lon, { lat: n.lat, lng: n.lon });
-      return Math.hypot(x, y) <= RADIUS;
-    });
-    if (inRange) run.push([g.lat, g.lon]);
+    if (stationNodes.some(n => distTo(g.lat, g.lon, n) <= RADIUS)) run.push([g.lat, g.lon]);
     else if (run.length) { axes.push(run); run = []; }
   }
   if (run.length) axes.push(run);
-  return axes.filter(a => a.length >= 2);
+  // linku osy určí nejbližší node stanice — u přestupních má každá linka vlastní node
+  return axes.filter(a => a.length >= 2).map(pts => {
+    const mid = pts[Math.floor(pts.length / 2)];
+    const near = stationNodes.reduce((best, n) =>
+      distTo(mid[0], mid[1], n) < distTo(mid[0], mid[1], best) ? n : best);
+    return { line: LINE_BY_COLOUR[near.tags.colour], pts };
+  });
 }
 
 const stations = [...byName.entries()].map(([name, ns]) => {
@@ -65,11 +69,15 @@ assert.ok(stations.length >= 55 && stations.length <= 62, `počet stanic: ${stat
 for (const s of stations) {
   assert.ok(s.axes.length >= 1, `${s.name}: žádná osa`);
   assert.ok(s.lines.length >= 1 && s.lines.every(l => 'ABC'.includes(l)), `${s.name}: linky=${s.lines}`);
+  // každá linka stanice musí mít vlastní osu — hráč za ni kreslí samostatnou úsečku
+  for (const l of s.lines) {
+    assert.ok(s.axes.some(a => a.line === l), `${s.name}: linka ${l} bez osy`);
+  }
 }
 for (const t of TRANSFERS) {
   const s = stations.find(x => x.name === t);
   assert.ok(s, `chybí přestupní ${t}`);
-  assert.ok(s.isTransfer && s.axes.length >= 2, `${t}: axes=${s.axes.length}`);
+  assert.ok(s.isTransfer && s.lines.length === 2, `${t}: linky=${s.lines}`);
 }
 assert.equal(stations.filter(s => s.isTransfer).length, 3);
 
