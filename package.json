@@ -1,0 +1,13 @@
+{
+  "name": "prague-metro-guesser",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/",
+    "build:stations": "node scripts/build-stations.mjs",
+    "dev": "wrangler pages dev web"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}
