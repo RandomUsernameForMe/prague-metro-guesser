@@ -5,6 +5,7 @@ import { toLocalMeters } from '../web/shared/geo.mjs';
 
 const RADIUS = 150; // m — osa stanice = koleje do RADIUS od nodu stanice
 const TRANSFERS = new Set(['Můstek', 'Muzeum', 'Florenc']);
+const LINE_BY_COLOUR = { green: 'A', yellow: 'B', red: 'C' };
 const QUERY = `[out:json][timeout:120];
 (node(49.95,14.2,50.15,14.7)["railway"="station"]["station"="subway"];)->.s;
 .s out body;
@@ -55,12 +56,16 @@ const stations = [...byName.entries()].map(([name, ns]) => {
   const lat = ns.reduce((s, n) => s + n.lat, 0) / ns.length;
   const lng = ns.reduce((s, n) => s + n.lon, 0) / ns.length;
   const axes = ways.flatMap(w => clipAxes(ns, w));
-  return { id: String(ns[0].id), name, lat, lng, isTransfer: TRANSFERS.has(name), axes };
+  const lines = [...new Set(ns.map(n => LINE_BY_COLOUR[n.tags.colour]))].sort();
+  return { id: String(ns[0].id), name, lat, lng, lines, isTransfer: TRANSFERS.has(name), axes };
 }).sort((a, b) => a.name.localeCompare(b.name, 'cs'));
 
 // validace
 assert.ok(stations.length >= 55 && stations.length <= 62, `počet stanic: ${stations.length}`);
-for (const s of stations) assert.ok(s.axes.length >= 1, `${s.name}: žádná osa`);
+for (const s of stations) {
+  assert.ok(s.axes.length >= 1, `${s.name}: žádná osa`);
+  assert.ok(s.lines.length >= 1 && s.lines.every(l => 'ABC'.includes(l)), `${s.name}: linky=${s.lines}`);
+}
 for (const t of TRANSFERS) {
   const s = stations.find(x => x.name === t);
   assert.ok(s, `chybí přestupní ${t}`);
