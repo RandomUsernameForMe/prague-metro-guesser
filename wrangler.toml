@@ -5,4 +5,4 @@ pages_build_output_dir = "web"
 [[d1_databases]]
 binding = "DB"
 database_name = "metro-guesser"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "853881c9-743d-4803-88cb-71cf7cf98b72"
