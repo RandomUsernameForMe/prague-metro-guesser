@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Metro Guesser — kde vede pražské metro?</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="stage">
+    <div id="tiles"></div>
+    <svg id="draw"></svg>
+    <header id="hud">
+      <strong id="hud-station">…</strong>
+      <span id="hud-round"></span>
+      <span id="hud-score"></span>
+    </header>
+    <div id="controls">
+      <button id="clear" class="btn-ghost">Smazat</button>
+      <button id="confirm" class="btn-primary" disabled>Potvrdit</button>
+    </div>
+    <div id="overlay" hidden></div>
+    <footer id="attribution">snímky © ČÚZK / Esri · data © přispěvatelé OpenStreetMap</footer>
+  </main>
+  <script type="module" src="app.mjs"></script>
+</body>
+</html>
