@@ -79,12 +79,14 @@ function paintPanel() {
   $('round-label').textContent = mode === 'weekly'
     ? `kolo ${roundIdx + 1} z ${rounds.length} · týden ${week}`
     : 'trénink · bez zápisu do žebříčku';
-  $('progress').replaceChildren(...Array.from({ length: mode === 'weekly' ? rounds.length : 1 }, (_, i) => {
-    const li = document.createElement('li');
-    if (i < roundIdx) li.className = 'done';
-    else if (i === roundIdx) li.className = 'now';
-    return li;
-  }));
+  $('progress').replaceChildren(...(mode === 'weekly'
+    ? Array.from({ length: rounds.length }, (_, i) => {
+      const li = document.createElement('li');
+      if (i < roundIdx) li.className = 'done';
+      else if (i === roundIdx) li.className = 'now';
+      return li;
+    })
+    : []));
   $('home').hidden = mode !== 'training';
 }
 
@@ -109,7 +111,7 @@ function startRound() {
   paintPanel();
   overlay.hidden = true;
   $('clear').disabled = false;
-  document.body.dataset.phase = 'play';
+  document.body.dataset.phase = mode; // 'weekly' | 'training' — v tréninku se skóre nesbírá
   if (!localStorage.getItem(hintKey)) {
     hintEl.textContent = 'Klikni nebo táhni přes snímek — nakresli, kudy stanice vede pod zemí.';
     hintEl.hidden = false;

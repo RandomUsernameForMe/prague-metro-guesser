@@ -143,9 +143,11 @@ body {
 
 #controls { display: grid; gap: 10px; }
 
-/* v úvodu nemá smysl ukazovat skóre ani ovládání kreslení */
+/* v úvodu nemá smysl ukazovat skóre ani ovládání kreslení, v tréninku skóre */
 body[data-phase='intro'] .score,
-body[data-phase='intro'] #controls { display: none; }
+body[data-phase='intro'] #controls,
+body[data-phase='training'] .score { display: none; }
+body[data-phase='training'] #controls { margin-top: auto; }
 .btn {
   font: 600 14px/1 Archivo, sans-serif;
   letter-spacing: 0.12em; text-transform: uppercase;
