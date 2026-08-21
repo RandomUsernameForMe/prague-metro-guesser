@@ -4,13 +4,10 @@ import { scoreRound } from '../web/shared/scoring.mjs';
 import { validateRound } from '../web/shared/validate.mjs';
 import { initialState, reduce, roundMsFor, guessesForRound } from '../web/shared/duel-machine.mjs';
 import { CODE_RE } from '../web/shared/code.mjs';
+import { ipHash, duelSeed } from './hash.js';
 
 const TOKEN_RE = /^[0-9a-f]{16}$/;
-
-async function sha256(s) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
-  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
-}
+const CLEANUP_MS = 300000; // po dohraném zápase se storage Durable Objectu smaže
 
 export class MatchDO {
   constructor(ctx, env) {
@@ -21,7 +18,8 @@ export class MatchDO {
   // po hibernaci je instance prázdná — stav a kola se dopočítají z kódu a storage
   async load(code) {
     if (this.state) return;
-    this.rounds = weeklyChallenge(code, stations);
+    // seed přes secret: z veřejného kódu zápasu si stanice nikdo dopředu nespočítá
+    this.rounds = weeklyChallenge(await duelSeed(code, this.env), stations);
     this.seats = (await this.ctx.storage.get('seats')) ?? {};
     this.guesses = (await this.ctx.storage.get('guesses')) ?? {}; // seat → {i, lines} posledního tipu
     this.state = (await this.ctx.storage.get('state'))
@@ -65,6 +63,9 @@ export class MatchDO {
 
     if (msg.type === 'ready') return this.apply({ type: 'ready', playerId: seat }, Date.now());
     if (msg.type !== 'submit') return;
+    // levná brána dřív než skórování a dva zápisy do storage — tyhle tipy automat stejně zahodí
+    const s = this.state;
+    if (s.phase !== 'drawing' || msg.i !== s.roundIndex || s.players[seat]?.submitted) return;
 
     const round = this.rounds[msg.i];
     if (!round) return;
@@ -82,6 +83,9 @@ export class MatchDO {
 
   async webSocketClose(ws) {
     const { seat, code } = ws.deserializeAttachment();
+    // po reloadu se nový socket stihne připojit dřív, než dorazí close toho starého —
+    // pak není co pauzovat, hráč sedí u počítače
+    if (this.ctx.getWebSockets(seat).some(other => other !== ws)) return;
     await this.load(code);
     await this.apply({ type: 'disconnect', playerId: seat }, Date.now());
   }
@@ -94,6 +98,12 @@ export class MatchDO {
     const code = await this.ctx.storage.get('code');
     if (!code) return;
     await this.load(code);
+    // po dohraném zápase má alarm jediný úkol: uklidit po sobě
+    if (this.state.phase === 'ended') {
+      await this.ctx.storage.deleteAll();
+      this.state = null;
+      return;
+    }
     await this.apply({ type: 'timeout' }, Date.now());
   }
 
@@ -108,6 +118,8 @@ export class MatchDO {
         this.send(fx.to, fx.msg);
       } else if (fx.type === 'finish') {
         await this.persist(fx);
+        // end() posílá alarm(null) dřív v poli efektů, takže tenhle úklid přežije
+        await this.ctx.storage.setAlarm(Date.now() + CLEANUP_MS);
       }
     }
   }
@@ -121,19 +133,31 @@ export class MatchDO {
     }
   }
 
+  // zadání kola: co klient potřebuje, aby ho uměl vykreslit
+  roundInfo(i) {
+    const st = this.rounds[i].station;
+    return {
+      i,
+      viewport: roundViewport(this.rounds[i]),
+      name: st.name,      // jméno je zadání kola, ne tajemství
+      lines: st.lines,
+    };
+  }
+
   // automat neví nic o stanicích ani o hodinách klienta — doplní se to tady
   enrich(msg) {
     const out = { ...msg };
     if (out.deadline > 0) out.msLeft = Math.max(0, out.deadline - Date.now()); // proti rozjetým hodinám klienta
-    if (out.type === 'round') {
-      const st = this.rounds[out.i].station;
-      out.viewport = roundViewport(this.rounds[out.i]);
-      out.name = st.name;      // jméno je zadání kola, ne tajemství
-      out.lines = st.lines;
-    }
+    if (out.type === 'round') Object.assign(out, this.roundInfo(out.i));
+    // po reloadu i po odpauzování se klient vrací doprostřed kola — bez zadání by kreslil naslepo
+    if (out.type === 'state' && out.phase === 'drawing') Object.assign(out, this.roundInfo(out.roundIndex));
+    // dlaždice dalšího kola ať se stáhnou, dokud běží odpočet nebo odhalení
+    if (out.type === 'state' && out.phase === 'countdown') out.nextViewport = roundViewport(this.rounds[0]);
     if (out.type === 'reveal') {
       out.axes = this.rounds[out.i].station.axes;   // skutečné osy až po konci kola
       out.guesses = guessesForRound(this.guesses, out.i); // i tipy soupeře — kolo skončilo, není co tajit
+      const next = this.rounds[out.i + 1];
+      if (next) out.nextViewport = roundViewport(next);
     }
     return out;
   }
@@ -153,7 +177,7 @@ export class MatchDO {
   async logGuess({ session, ip, round, i, segments, score, complete }) {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(session ?? '')) return;
     const r = complete ? scoreRound(segments, round.station) : null;
-    const ipHash = await sha256(ip ?? '');
+    const hash = await ipHash(ip, this.env);
     try {
       await this.env.DB.prepare(
         `INSERT INTO guesses (session, mode, week, station_id, round_idx, u, v, segments_json,
@@ -162,7 +186,7 @@ export class MatchDO {
       ).bind(
         session, isoWeek(new Date()), round.station.id, i, round.u, round.v,
         JSON.stringify(segments), r?.d ?? null, score, r ? JSON.stringify(r.perLine) : null,
-        complete ? 0 : 1, ipHash,
+        complete ? 0 : 1, hash,
       ).run();
     } catch { /* statistika nesmí shodit zápas */ }
   }

@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS scores (
   UNIQUE(week, nick)
 );
 CREATE INDEX IF NOT EXISTS idx_scores_week ON scores(week, score DESC);
+-- rate limit se ptá „kolik zápisů má tahle IP za poslední hodinu"; bez indexu se čte celá tabulka
+CREATE INDEX IF NOT EXISTS idx_scores_ip ON scores(ip_hash, created_at);
 
 -- hlášení „stanice je v aplikaci zadaná špatně" z výsledkové karty
 CREATE TABLE IF NOT EXISTS reports (
@@ -23,6 +25,7 @@ CREATE TABLE IF NOT EXISTS reports (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_reports_created ON reports(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reports_ip ON reports(ip_hash, created_at);
 
 -- jeden řádek = jedno odehrané kolo, ve všech režimech; podklad pro exporty a statistiky
 CREATE TABLE IF NOT EXISTS guesses (
@@ -46,6 +49,7 @@ CREATE TABLE IF NOT EXISTS guesses (
 );
 CREATE INDEX IF NOT EXISTS idx_guesses_station ON guesses(station_id);
 CREATE INDEX IF NOT EXISTS idx_guesses_created ON guesses(created_at);
+CREATE INDEX IF NOT EXISTS idx_guesses_ip ON guesses(ip_hash, created_at);
 
 -- jeden řádek = jeden dohraný duel; zapisuje MatchDO na konci zápasu
 CREATE TABLE IF NOT EXISTS duels (
@@ -55,7 +59,7 @@ CREATE TABLE IF NOT EXISTS duels (
   score_a INTEGER NOT NULL,
   score_b INTEGER NOT NULL,
   winner TEXT,                  -- 'a' | 'b' | NULL při remíze
-  ended_reason TEXT NOT NULL,   -- 'complete' | 'forfeit' | 'noshow'
+  ended_reason TEXT NOT NULL,   -- 'complete' | 'forfeit' | 'noshow' | 'alone' (soupeř nikdy nedorazil)
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_duels_created ON duels(created_at DESC);

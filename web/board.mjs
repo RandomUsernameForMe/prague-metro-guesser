@@ -14,7 +14,10 @@ let pressing = false;
 let required = 1;
 let viewport = null;
 let onChange = null;
-let axesExtra = '';     // osy, které mají zůstat i pod dalším kreslením
+let lastSize = 0;       // hrana stage při posledním překreslení — podle ní se přepočítává resize
+// co se kreslí pod hráčovy úsečky (osy, tip soupeře). Funkce, ne hotový string:
+// souřadnice jsou v px, takže se po změně velikosti okna musí spočítat znovu.
+let extra = () => '';
 
 export const sizePx = () => stage.clientWidth;
 export const count = () => segs.length;
@@ -30,11 +33,11 @@ const segMarkup = ([[x1, y1], [x2, y2]], preview = false) =>
      stroke-linecap="round"${preview ? ' stroke-dasharray="8 6" opacity="0.85"' : ''}/>` +
   `<circle cx="${x1}" cy="${y1}" r="5" fill="var(--draw)"/><circle cx="${x2}" cy="${y2}" r="5" fill="var(--draw)"/>`;
 
-export function redraw(extra = axesExtra) {
+export function redraw() {
   // jen číselné souřadnice z kliků — žádná externí data
   const markup = segs.map(s => segMarkup(s)).join('')
     + (anchor && cursor ? segMarkup([anchor, cursor], true) : '')
-    + extra;
+    + extra();
   svg.replaceChildren(...parseSvg(markup));
   onChange?.(segs.length, required);
 }
@@ -81,11 +84,32 @@ export function onSegmentsChange(cb) { onChange = cb; }
 export function setRound(vp, req) {
   viewport = vp;
   required = req;
-  axesExtra = '';
+  extra = () => '';
   segs = []; anchor = cursor = null;
-  renderTiles(tilesEl, vp, sizePx());
+  lastSize = sizePx();
+  renderTiles(tilesEl, vp, lastSize);
   redraw();
 }
+
+// Otočení telefonu mění hranu stage, ale úsečky i dlaždice jsou v px té staré.
+// Bez přepočtu by kresba ujela od mapy, takže se všechno přeškáluje poměrem stran.
+// Tažení za roh okna sype resize dávkami — dlaždice tahá až ten poslední.
+let resizeTimer = null;
+addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    const size = sizePx();
+    if (!viewport || !size || !lastSize || size === lastSize) return;
+    const k = size / lastSize;
+    const scale = ([x, y]) => [x * k, y * k];
+    segs = segs.map(seg => seg.map(scale));
+    if (anchor) anchor = scale(anchor);
+    if (cursor) cursor = scale(cursor);
+    lastSize = size;
+    renderTiles(tilesEl, viewport, size);
+    redraw();
+  }, 150);
+});
 
 export function prefetch(vp) { prefetchTiles(vp, sizePx()); }
 
@@ -120,26 +144,35 @@ const rivalMarkup = segs => (segs ?? []).map(seg => {
 
 // dokreslí skutečné osy po potvrzení kola, případně i tip soupeře
 export function revealAxes(axes, rival) {
-  redraw(rivalMarkup(rival) + axesMarkup(axes, true)
-    + `<style>@keyframes reveal { to { stroke-dashoffset: 0; } }</style>`);
+  extra = () => rivalMarkup(rival) + axesMarkup(axes, true)
+    + `<style>@keyframes reveal { to { stroke-dashoffset: 0; } }</style>`;
+  redraw();
 }
 
 // osy zůstanou pod dalším kreslením jako předloha (hráč opravuje chybnou stanici)
 export function keepAxes(axes) {
-  axesExtra = axes ? axesMarkup(axes, false) : '';
+  extra = axes ? () => axesMarkup(axes, false) : () => '';
   redraw();
 }
 
 // ---------- odpočet ----------
-let timerRaf = null, deadline = 0, total = 0, expired = null;
+let timerRaf = null, timerTimeout = null, deadline = 0, total = 0, expired = null;
 
 export function timerStop() {
   if (timerRaf) cancelAnimationFrame(timerRaf);
-  timerRaf = null;
+  clearTimeout(timerTimeout);
+  timerRaf = timerTimeout = null;
   timebar.hidden = true;
   clockEl.hidden = true;
   timebar.classList.remove('urgent');
   clockEl.classList.remove('urgent');
+}
+
+// vypršení musí padnout právě jednou, ať přijde z rAF nebo ze záložního timeoutu
+function fire() {
+  const onExpire = expired;
+  timerStop();
+  onExpire?.();
 }
 
 // totalMs: plná délka kola. onExpire se zavolá, až doběhne.
@@ -158,14 +191,17 @@ export function timerStart(totalMs, onExpire) {
     const urgent = left <= 5000;
     timebar.classList.toggle('urgent', urgent);
     clockEl.classList.toggle('urgent', urgent);
-    if (left <= 0) { timerRaf = null; expired?.(); return; }
+    if (left <= 0) return fire();
     timerRaf = requestAnimationFrame(tick);
   };
   timerRaf = requestAnimationFrame(tick);
+  timerTimeout = setTimeout(fire, totalMs); // rAF na skryté kartě stojí, kolo by nikdy nedoběhlo
 }
 
 // shot clock: server řekl, kolik ms zbývá — hodiny klienta se neptáme
 export function timerSetLeft(msLeft) {
   if (!timerRaf) return;
   deadline = performance.now() + msLeft;
+  clearTimeout(timerTimeout);
+  timerTimeout = setTimeout(fire, msLeft);
 }

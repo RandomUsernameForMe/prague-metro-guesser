@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { initialState, reduce, COUNTDOWN_MS, SHOT_CLOCK_MS, REVEAL_MS, GRACE_MS, READY_MS, guessesForRound } from '../web/shared/duel-machine.mjs';
+import { initialState, reduce, COUNTDOWN_MS, SHOT_CLOCK_MS, REVEAL_MS, GRACE_MS, READY_MS, WAITING_MS, guessesForRound } from '../web/shared/duel-machine.mjs';
 
 const NOW = 1_000_000;
 const ROUND_MS = [20000, 30000, 20000]; // tři kola, druhé je přestup
@@ -16,11 +16,34 @@ const paired = (now = NOW) => join(join(fresh(), 'a', 'Ada', now).state, 'b', 'B
 // oba potvrdili → běží odpočet do startu
 const counting = (now = NOW) => ready(ready(paired(now), 'a', now).state, 'b', now).state;
 
-test('první hráč čeká, žádný alarm se nestaví', () => {
+test('první hráč čeká, ale ne donekonečna', () => {
   const { state, effects } = join(fresh(), 'a', 'Ada');
   assert.equal(state.phase, 'waiting');
-  assert.deepEqual(alarms(effects), []);
+  assert.equal(state.deadline, NOW + WAITING_MS);
+  assert.deepEqual(alarms(effects), [NOW + WAITING_MS]);
   assert.equal(state.players.a.nick, 'Ada');
+});
+
+test('když soupeř nedorazí, zápas se zruší bez vítěze', () => {
+  const alone = join(fresh(), 'a', 'Ada').state;
+  const { state, effects } = reduce(alone, { type: 'timeout' }, NOW + WAITING_MS);
+  assert.equal(state.phase, 'ended');
+  assert.equal(state.reason, 'alone');
+  assert.equal(state.winner, null);
+  assert.deepEqual(alarms(effects), [null], 'čekání skončilo, další alarm není na co');
+});
+
+test('příchod druhého hráče přebije alarm čekání ready checkem', () => {
+  const { effects } = join(join(fresh(), 'a', 'Ada').state, 'b', 'Bob');
+  assert.deepEqual(alarms(effects), [NOW + READY_MS]);
+});
+
+test('do dohraného zápasu se nikdo nepřidá', () => {
+  const end = playOut(drawing(), { a: [1, 1, 1], b: [2, 2, 2] });
+  const { state, effects } = reduce(end, { type: 'join', playerId: 'c', nick: 'Cyril' }, end.deadline + 1000);
+  assert.equal(state.phase, 'ended');
+  assert.deepEqual(state.order, ['a', 'b'], 'třetí hráč se do pořadí nedostane');
+  assert.deepEqual(sent(effects), [{ type: 'error', error: 'ended' }]);
 });
 
 test('druhý hráč spustí ready check, ne rovnou zápas', () => {

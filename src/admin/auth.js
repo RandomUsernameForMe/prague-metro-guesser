@@ -2,10 +2,7 @@
 // takže heslo se ověřuje na jednom místě pro všechny admin stránky.
 // Heslo: `npx wrangler secret put ADMIN_PASSWORD` (lokálně řádek v .dev.vars)
 
-async function sha256(s) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
-  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
-}
+import { sha256 } from '../hash.js';
 
 // hesla porovnáváme jako otisky stejné délky — na délku ani obsah se tím nedá hádat
 async function authorized(request, env) {

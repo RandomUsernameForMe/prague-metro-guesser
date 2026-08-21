@@ -32,9 +32,20 @@ const ADMIN_ROUTES = {
 
 const MATCH_PATH = /^\/api\/duel\/([ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6})$/;
 
+// Cizí stránka umí poslat prostý POST bez preflightu (content-type: text/plain) a zapsat
+// tak data pod IP návštěvníka. Origin je jediné, čím se od našeho formuláře liší;
+// požadavky bez Origin (curl, smoke skript) prohlížeč neposílá, takže CSRF to nejsou.
+const sameOrigin = (request, url) => {
+  const origin = request.headers.get('origin');
+  return !origin || origin === url.origin;
+};
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (request.method === 'POST' && !sameOrigin(request, url)) {
+      return new Response('bad origin', { status: 403 });
+    }
 
     if (url.pathname === '/api/duel/queue' && request.method === 'POST') {
       return env.LOBBY.get(env.LOBBY.idFromName('global')).fetch(request);

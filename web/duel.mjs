@@ -14,6 +14,7 @@ if (!token) {
 
 let ws = null, you = null, code = null, roundIdx = 0, showCard = null, onLeave = null;
 let iSubmitted = false;  // shot clock se hlásí jen tomu, kdo ještě kreslí
+let inRound = false;     // kreslíme právě teď? rozhoduje, jestli se kolo obnoví, nebo přepíše
 
 export function initDuel({ card, leave }) {
   showCard = card;   // app.mjs umí vykreslit kartu do overlaye
@@ -23,7 +24,8 @@ export function initDuel({ card, leave }) {
 export async function findOpponent() {
   const res = await fetch('/api/duel/queue', { method: 'POST' });
   const { code: c, host } = await res.json();
-  connect(c, host ? 'Čekám na soupeře — vydrž, hledám ho ve frontě.' : 'Soupeř nalezen!');
+  // i „nalezený" zápas může být prázdný, když protějšek mezitím zavřel kartu — slibovat se to nedá
+  connect(c, host ? 'Čekám na soupeře — vydrž, hledám ho ve frontě.' : 'Našel jsem volný zápas, připojuji tě.');
 }
 
 export function hostDuel() {
@@ -61,9 +63,14 @@ function handle(msg) {
     case 'opponent': return onOpponent(msg);
     case 'reveal': return onReveal(msg);
     case 'end': return onEnd(msg);
-    case 'error': return waitingCard('Zápas je plný — tenhle kód už hrajou dva lidi.', true);
+    case 'error': return waitingCard(msg.error === 'ended'
+      ? 'Tenhle zápas už skončil. Založ si nový.'
+      : 'Zápas je plný — tenhle kód už hrajou dva lidi.', true);
   }
 }
+
+// dlaždice příštího kola se stáhnou, dokud běží odhalení nebo odpočet do startu
+const prefetchNext = msg => { if (msg.nextViewport) board.prefetch(msg.nextViewport); };
 
 // soupeř odevzdal → do konce kola zbývá jen shot clock, ať to hráč nepřehlédne
 function onShotClock(msg) {
@@ -82,9 +89,21 @@ function onState(msg) {
   $('duel-flag').className = `duel-flag ${them && !them.connected ? 'gone' : ''}`;
   if (msg.phase === 'waiting') waitingCard('Čekám na soupeře.', false, true);
   if (msg.phase === 'ready') readyCard(msg);
-  if (msg.phase === 'countdown') waitingCard(`${them?.nick ?? 'Soupeř'} je tu. Začínáme!`);
+  if (msg.phase === 'countdown') { waitingCard(`${them?.nick ?? 'Soupeř'} je tu. Začínáme!`); prefetchNext(msg); }
   if (msg.phase === 'paused') waitingCard('Soupeř se odpojil — čekám 15 vteřin.');
-  if (msg.phase === 'drawing' && !overlay.hidden) overlay.hidden = true; // návrat doprostřed kola
+  if (msg.phase === 'ended') waitingCard('Zápas už skončil.', true); // reload až po konci
+  if (msg.phase === 'drawing') resumeRound(msg);
+}
+
+// state:drawing dorazí po reloadu i po odpauzování, a to oběma hráčům — kolo, které
+// zrovna kreslíme, se nesmí přepsat, jinak by soupeřův výpadek smazal naši úsečku
+function resumeRound(msg) {
+  if (!inRound || msg.i !== roundIdx) return onRound(msg); // vstup doprostřed kola: zadání jsme neviděli
+  overlay.hidden = true;
+  if (iSubmitted) return;
+  $('clear').disabled = false;
+  $('confirm').disabled = board.count() < msg.lines.length;
+  board.timerStart(msg.msLeft, submit);
 }
 
 // oba museli potvrdit, že sedí u počítače — jinak zápas začne bez jednoho z nich
@@ -117,6 +136,7 @@ const waitForOpponent = btn => {
 function onRound(msg) {
   roundIdx = msg.i;
   iSubmitted = false;
+  inRound = true;
   $('duel-shot').hidden = true;
   $('duel-legend').hidden = true;
   overlay.hidden = true;
@@ -166,6 +186,8 @@ function onOpponent(msg) {
 
 function onReveal(msg) {
   board.timerStop();
+  inRound = false;
+  prefetchNext(msg);
   $('duel-shot').hidden = true;
   $('duel-me').textContent = msg.totals[you].toLocaleString('cs');
   const themId = Object.keys(msg.totals).find(id => id !== you);
@@ -185,10 +207,13 @@ function onReveal(msg) {
 
 function onEnd(msg) {
   board.timerStop();
+  inRound = false;
   $('duel-shot').hidden = true;
   $('duel-legend').hidden = true;
   const themId = Object.keys(msg.totals).find(id => id !== you);
-  const verdict = msg.reason === 'noshow'
+  const verdict = msg.reason === 'alone'
+    ? 'Nikdo nedorazil — zkus to znovu'
+    : msg.reason === 'noshow'
     ? (msg.winner === null ? 'Nikdo nepotvrdil — zápas zrušen'
       : msg.winner === you ? 'Soupeř nepotvrdil — vyhrál jsi' : 'Nepotvrdil jsi včas — zápas propadl')
     : msg.reason === 'forfeit'

@@ -2,14 +2,10 @@ import stations from '../../web/stations.json';
 import { isoWeek } from '../../web/shared/seed.mjs';
 import { scoreRound } from '../../web/shared/scoring.mjs';
 import { validateRound } from '../../web/shared/validate.mjs';
+import { ipHash } from '../hash.js';
 
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json' } });
-
-async function sha256(s) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
-  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
-}
 
 const MODES = new Set(['weekly', 'warmup', 'casual']);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -33,10 +29,10 @@ export async function onRequestPost({ request, env }) {
   const v = validateRound(b.segments, { station, u: b.u, v: b.v }, { allowPartial: b.forfeited });
   if (!v.ok) return json({ error: v.error }, 400);
 
-  const ipHash = await sha256(request.headers.get('cf-connecting-ip') || '');
+  const ip = await ipHash(request.headers.get('cf-connecting-ip'), env);
   const { cnt } = await env.DB.prepare(
     "SELECT COUNT(*) AS cnt FROM guesses WHERE ip_hash = ? AND created_at > datetime('now','-1 hour')"
-  ).bind(ipHash).first();
+  ).bind(ip).first();
   if (cnt >= HOURLY_LIMIT) return json({ error: 'rate limit' }, 429);
 
   // skóre počítá server ze samotných úseček; číslo od klienta se nikdy nepoužije
@@ -55,7 +51,7 @@ export async function onRequestPost({ request, env }) {
   ).bind(
     b.session, b.mode, isoWeek(new Date()), station.id, b.roundIdx, b.u, b.v,
     JSON.stringify(b.segments), dist, score, perLine, b.ms,
-    b.timedOut ? 1 : 0, b.forfeited ? 1 : 0, ipHash,
+    b.timedOut ? 1 : 0, b.forfeited ? 1 : 0, ip,
   ).run();
 
   // odpověď nic neprozrazuje — endpoint nesmí jít zneužít jako nápověda

@@ -1,5 +1,6 @@
 // Čistý stavový automat duelu. Nezná DOM, Cloudflare ani stanice — dostává
 // jen délky kol a už spočítané skóre, takže se testuje obyčejným node --test.
+export const WAITING_MS = 180000; // po třech minutách bez soupeře se čekání vzdá
 export const READY_MS = 60000;   // kdo do minuty nepotvrdí, od hry odešel
 export const COUNTDOWN_MS = 3000;
 export const REVEAL_MS = 3000;
@@ -66,8 +67,9 @@ export function reduce(state, event, now) {
 
 function join(s, { playerId, nick }, now, fx) {
   if (s.players[playerId]) return reconnect(s, { playerId }, now, fx); // návrat po výpadku
-  if (s.order.length >= 2) {
-    fx.push(send(playerId, { type: 'error', error: 'full' }));
+  // do dohraného zápasu se přisednout nedá — jinak by ho příchozí rozjel znovu
+  if (s.phase === 'ended' || s.order.length >= 2) {
+    fx.push(send(playerId, { type: 'error', error: s.phase === 'ended' ? 'ended' : 'full' }));
     return { state: s, effects: fx };
   }
   s.players[playerId] = { nick, connected: true, ready: false, total: 0, submitted: false, score: 0 };
@@ -76,6 +78,10 @@ function join(s, { playerId, nick }, now, fx) {
   if (s.order.length === 2) {
     s.phase = 'ready';
     s.deadline = now + READY_MS;
+    fx.push(alarm(s.deadline));
+  } else {
+    // mrtvý kód z fronty nebo kamarád, co nikdy nedorazí: čekání musí mít konec
+    s.deadline = now + WAITING_MS;
     fx.push(alarm(s.deadline));
   }
   fx.push(send('all', stateMsg(s)));
@@ -97,6 +103,7 @@ function markReady(s, { playerId }, now, fx) {
 
 function timeout(s, now, fx) {
   switch (s.phase) {
+    case 'waiting': return end(s, 'alone', fx);
     case 'ready': return end(s, 'noshow', fx);
     case 'countdown': return startRound(s, 0, now, fx);
     case 'drawing': return endRound(s, now, fx);
@@ -146,7 +153,9 @@ function end(s, reason, fx) {
   s.phase = 'ended';
   s.deadline = 0;
   s.reason = reason;
-  if (reason === 'noshow') {
+  if (reason === 'alone') {
+    s.winner = null;    // soupeř nikdy nedorazil, není co vyhrát
+  } else if (reason === 'noshow') {
     // vyhraje ten, kdo potvrdil; když nepotvrdil nikdo, není co vyhrát
     const waiting = s.order.filter(id => s.players[id].ready);
     s.winner = waiting.length === 1 ? waiting[0] : null;

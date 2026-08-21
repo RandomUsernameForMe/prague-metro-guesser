@@ -1,7 +1,11 @@
 import stations from '../../web/stations.json';
 
-const json = (obj, status = 200) =>
-  new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json' } });
+const json = (obj, status = 200, headers = {}) =>
+  new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json', ...headers } });
+
+// Agregace čte celou tabulku guesses a endpoint je veřejný — bez cache by každé
+// zavolání rostlo s databází a šlo tlouct ve smyčce. Čísla o pár minut starší nevadí.
+const TTL_S = 300;
 
 const MODES = new Set(['weekly', 'warmup', 'casual', 'duel']);
 const byId = new Map(stations.map(s => [s.id, s]));
@@ -12,6 +16,9 @@ const round1 = n => (n === null ? null : Math.round(n * 10) / 10);
 export async function onRequestGet({ request, env }) {
   const mode = new URL(request.url).searchParams.get('mode');
   if (mode && !MODES.has(mode)) return json({ error: 'mode' }, 400);
+
+  const cached = await caches.default.match(request);
+  if (cached) return cached;
 
   const stmt = env.DB.prepare(
     `SELECT station_id, COUNT(*) AS n, AVG(score) AS avg_score, AVG(dist_m) AS avg_dist,
@@ -34,5 +41,8 @@ export async function onRequestGet({ request, env }) {
     };
   }).sort((a, b) => a.avgScore - b.avgScore); // nejtěžší stanice první
 
-  return json({ mode: mode ?? 'all', stations: entries });
+  const res = json({ mode: mode ?? 'all', stations: entries }, 200,
+    { 'cache-control': `public, max-age=${TTL_S}` });
+  await caches.default.put(request, res.clone());
+  return res;
 }
