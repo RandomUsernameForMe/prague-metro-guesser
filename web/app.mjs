@@ -11,7 +11,7 @@ const week = isoWeek(new Date());
 const playedKey = `pmg-played-${week}`;
 const hintKey = 'pmg-hint-seen';
 
-const ROUND_SECONDS = 15;
+const SECONDS = { single: 20, transfer: 30 }; // přestup chce dvě úsečky, dostane víc času
 const ROUNDS = 10;
 
 // weekly: ostrá výzva se zápisem · warmup: 10 stanic mimo výzvu, na nečisto · casual: bez času a bez konce
@@ -26,6 +26,7 @@ let pressing = false;
 let lines = [];         // tahy pro odeslání, [[[lat,lng],[lat,lng]], ...] per kolo
 
 const required = () => rounds[roundIdx].station.lines.length;
+const roundSeconds = () => (required() > 1 ? SECONDS.transfer : SECONDS.single);
 
 const sizePx = () => stage.clientWidth;
 const vp = () => roundViewport(rounds[roundIdx]);
@@ -105,13 +106,14 @@ function stopTimer() {
 function startTimer() {
   stopTimer();
   if (!timed()) return;
-  deadline = performance.now() + ROUND_SECONDS * 1000;
+  const total = roundSeconds() * 1000;
+  deadline = performance.now() + total;
   timebar.hidden = false;
   clockEl.hidden = false;
   const bar = timebar.firstElementChild;
   const tick = now => {
     const left = Math.max(0, deadline - now);
-    bar.style.transform = `scaleX(${left / (ROUND_SECONDS * 1000)})`;
+    bar.style.transform = `scaleX(${left / total})`;
     const secs = Math.ceil(left / 1000);
     $('clock-value').textContent = secs;
     const urgent = left <= 5000;
@@ -424,7 +426,7 @@ function showIntro() {
     <h2>Metro Guesser</h2>
     <ol class="steps">
       <li><b>1</b><div>Dostaneš letecký snímek 600 × 600 m a jméno stanice.<br><span>Stanice je někde uvnitř, ale pod zemí ji nevidíš.</span></div></li>
-      <li><b>2</b><div>Za ${ROUND_SECONDS} sekund nakresli úsečku, kudy vede nástupiště.<br><span>Táhni prstem či myší, nebo klikni na začátek a konec. U přestupní stanice kreslíš úsečku pro každou linku. Nestihneš to → 0 bodů.</span></div></li>
+      <li><b>2</b><div>Za ${SECONDS.single} sekund nakresli úsečku, kudy vede nástupiště.<br><span>Táhni prstem či myší, nebo klikni na začátek a konec. U přestupní stanice kreslíš úsečku pro každou linku a máš ${SECONDS.transfer} s. Nestihneš to → 0 bodů.</span></div></li>
       <li><b>3</b><div>Potvrdíš a uvidíš skutečnou osu kolejí.<br><span>Čím blíž jsi trefil, tím víc bodů — max 1000 za kolo.</span></div></li>
     </ol>
     ${played
