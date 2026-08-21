@@ -21,11 +21,11 @@ export async function onRequestPost({ request, env }) {
   if (cnt >= 5) return json({ error: 'rate limit' }, 429);
 
   await env.DB.prepare(
-    `INSERT INTO reports (station_id, station_name, note, mode, week, segments_json, ip_hash)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO reports (station_id, station_name, note, mode, week, segments_json, fix_json, ip_hash)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     v.station.id, v.station.name, v.note, body.mode, body.week,
-    v.segments && JSON.stringify(v.segments), ipHash,
+    v.segments && JSON.stringify(v.segments), v.fix && JSON.stringify(v.fix), ipHash,
   ).run();
 
   return json({ ok: true });

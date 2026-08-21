@@ -4,8 +4,8 @@ import { page, html, esc } from './layout.js';
 const LIMIT = 200;
 
 // ponytail: souřadnice jako text; když je budeš chtít vidět v mapě, obal je odkazem na mapy.cz
-const segmentsCell = segmentsJson => {
-  if (!segmentsJson) return '<i>propadlé kolo — nic nenakreslil</i>';
+const segmentsCell = (segmentsJson, empty = '<i>propadlé kolo — nic nenakreslil</i>') => {
+  if (!segmentsJson) return empty;
   try {
     return JSON.parse(segmentsJson)
       .map(seg => seg.map(([lat, lng]) => `${lat.toFixed(5)},${lng.toFixed(5)}`).join(' → '))
@@ -27,11 +27,12 @@ function stationCell(r) {
 
 const body = rows => `<p><small>${rows.length} hlášení, zobrazuje se posledních ${LIMIT}.</small></p>
 ${rows.length ? `<table>
-<tr><th>kdy</th><th>stanice</th><th>jak to má být správně</th><th>co nakreslil</th><th>režim</th></tr>
+<tr><th>kdy</th><th>stanice</th><th>kudy osa vede podle hráče</th><th>komentář</th><th>co nakreslil v kole</th><th>režim</th></tr>
 ${rows.map(r => `<tr>
   <td><small>${esc(r.created_at)}</small></td>
   <td>${stationCell(r)}</td>
-  <td class="note">${esc(r.note)}</td>
+  <td><small>${segmentsCell(r.fix_json, '<i>osu nezakreslil</i>')}</small></td>
+  <td class="note">${r.note ? esc(r.note) : '<i>—</i>'}</td>
   <td><small>${segmentsCell(r.segments_json)}</small></td>
   <td><small>${esc(r.mode)}<br>${esc(r.week)}</small></td>
 </tr>`).join('')}
