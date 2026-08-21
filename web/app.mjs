@@ -515,8 +515,8 @@ function showIntro() {
       ? `<p>Týdenní výzvu už jsi tenhle týden odehrál jako <strong id="played-nick"></strong>.</p>
          <button class="btn btn-primary" id="warmup">Rozehřátí (${ROUNDS} stanic na nečisto)</button>
          <button class="btn btn-ghost" id="lb">Žebříček</button>`
-      : `<button class="btn btn-primary" id="warmup">Rozehřátí — ${ROUNDS} stanic na nečisto</button>
-         <button class="btn btn-ghost" id="play">Rovnou týdenní výzva na ostro</button>`}
+      : `<button class="btn btn-primary" id="play">Týdenní výzva na ostro</button>
+         <button class="btn btn-ghost" id="warmup">Rozehřátí — ${ROUNDS} stanic na nečisto</button>`}
     <button class="link-btn" id="casual">casual mode — bez času, bez konce, bez zápisu</button>
   `, card => {
     if (played) {
