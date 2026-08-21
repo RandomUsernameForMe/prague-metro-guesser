@@ -184,7 +184,8 @@ body {
 /* v úvodu nemá smysl ukazovat skóre ani ovládání kreslení, v casual módu skóre */
 body[data-phase='intro'] .stats,
 body[data-phase='intro'] #controls,
-body[data-phase='casual'] .score { display: none; }
+body[data-phase='casual'] .score,
+body[data-phase='duel'] .score { display: none; } /* v duelu se skóre čte z pruhu se soupeřem */
 body[data-phase='casual'] .stats:empty,
 body[data-phase='casual'] #controls { margin-top: auto; }
 .btn {
