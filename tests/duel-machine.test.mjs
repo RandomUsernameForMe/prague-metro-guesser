@@ -254,6 +254,12 @@ test('odpojení uprostřed kola zápas pauzne a nastaví grace', () => {
   assert.deepEqual(alarms(effects), [t + GRACE_MS]);
 });
 
+test('odpojení pošle i stav, jinak soupeř kreslí do stojícího zápasu', () => {
+  const { effects } = reduce(drawing(), { type: 'disconnect', playerId: 'b' }, NOW + 1000);
+  const paused = sent(effects).filter(m => m.type === 'state' && m.phase === 'paused');
+  assert.equal(paused.length, 1, 'bez state zprávy se pauzovací karta nikdy neukáže');
+});
+
 test('návrat do patnácti sekund vrátí zbytek času, ne nových pět', () => {
   const s = drawing();
   const t = s.deadline - 8000;

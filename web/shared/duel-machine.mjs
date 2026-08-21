@@ -128,7 +128,12 @@ function disconnect(s, { playerId }, now, fx) {
     s.deadline = now + GRACE_MS;
     fx.push(alarm(s.deadline));
   }
-  fx.push(send('all', { type: 'opponent', id: playerId, connected: false, submitted: p.submitted }));
+  // stav musí ven taky, jinak se druhý hráč nikdy nedozví, že se pauzuje, a kreslí
+  // do zápasu, který stojí — jeho tip by pak automat zahodil
+  fx.push(
+    send('all', { type: 'opponent', id: playerId, connected: false, submitted: p.submitted }),
+    send('all', stateMsg(s)),
+  );
   return { state: s, effects: fx };
 }
 

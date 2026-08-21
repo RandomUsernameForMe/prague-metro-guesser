@@ -9,10 +9,16 @@ import { ipHash, duelSeed } from './hash.js';
 const TOKEN_RE = /^[0-9a-f]{16}$/;
 const CLEANUP_MS = 300000; // po dohraném zápase se storage Durable Objectu smaže
 
+// Prohlížeč z JS ping rámce posílat neumí, takže tluče vlastní zprávou. Přes
+// autoresponse na ni odpoví runtime sám a Durable Object se kvůli tomu neprobudí.
+const PING = '{"type":"ping"}';
+const PONG = '{"type":"pong"}';
+
 export class MatchDO {
   constructor(ctx, env) {
     this.ctx = ctx;
     this.env = env;
+    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(PING, PONG));
   }
 
   // po hibernaci je instance prázdná — stav a kola se dopočítají z kódu a storage

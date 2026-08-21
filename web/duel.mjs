@@ -12,9 +12,16 @@ if (!token) {
   sessionStorage.setItem('pmg-duel-token', token);
 }
 
+const PING = '{"type":"ping"}';       // MatchDO na tohle odpoví bez probuzení
+const PING_MS = 25000;
+const RETRY_MS = [400, 800, 1600, 3200, 6400]; // součet < 15 s, aby se vešel do grace
+
 let ws = null, you = null, code = null, roundIdx = 0, showCard = null, onLeave = null;
 let iSubmitted = false;  // shot clock se hlásí jen tomu, kdo ještě kreslí
 let inRound = false;     // kreslíme právě teď? rozhoduje, jestli se kolo obnoví, nebo přepíše
+let closing = false;     // zavíráme sami (konec zápasu) → žádný pokus o návrat
+let everOpened = false;  // odlišuje spadlou síť od zápasu, který nás nikdy nepustil dál
+let retries = 0, pingTimer = null;
 
 export function initDuel({ card, leave }) {
   showCard = card;   // app.mjs umí vykreslit kartu do overlaye
@@ -50,6 +57,17 @@ export function joinDuel(c) {
 
 function connect(c, note) {
   code = c;
+  closing = false;
+  everOpened = false;
+  retries = 0;
+  $('confirm').onclick = submit;   // v duelu potvrzení posílá tip, nevyhodnocuje kolo lokálně
+  document.body.dataset.phase = 'duel';
+  $('duel').hidden = false;
+  waitingCard(note ?? 'Čekám na kamaráda.', false, true);
+  openSocket();
+}
+
+function openSocket() {
   const nick = localStorage.getItem('pmg-nick') ?? 'hráč';
   const session = localStorage.getItem('pmg-session') ?? '';
   const url = new URL(`/api/duel/${code}`, location.href);
@@ -61,15 +79,35 @@ function connect(c, note) {
     // konstruktor umí házet (blokované schéma, mixed content) — pak by karta nikdy nedorazila
     return failCard(`Spojení se nepodařilo otevřít (${e.message}).`);
   }
+  ws.onopen = () => {
+    everOpened = true;
+    clearInterval(pingTimer);
+    // nečinný socket zavře kdejaká proxy dřív, než doběhne ready check
+    pingTimer = setInterval(() => ws?.readyState === WebSocket.OPEN && ws.send(PING), PING_MS);
+  };
   ws.onmessage = e => handle(JSON.parse(e.data));
-  ws.onclose = () => { board.timerStop(); waitingCard('Spojení se serverem spadlo.', true); };
-  $('confirm').onclick = submit;   // v duelu potvrzení posílá tip, nevyhodnocuje kolo lokálně
-  document.body.dataset.phase = 'duel';
-  $('duel').hidden = false;
-  waitingCard(note ?? 'Čekám na kamaráda.', false, true);
+  ws.onclose = () => {
+    clearInterval(pingTimer);
+    board.timerStop();
+    if (closing) return;
+    // socket, který se nikdy neotevřel, není výpadek sítě: DO vrátil 409 nebo 400
+    if (!everOpened) return failCard('K zápasu se nejde připojit — kód neplatí, nebo v něm už hrajou dva.');
+    reconnect();
+  };
+}
+
+// Server drží místo 15 vteřin (GRACE_MS v automatu), tak se do nich vejdi.
+// Sezení pozná server podle tokenu, takže návrat naváže na rozehrané kolo.
+function reconnect() {
+  const wait = RETRY_MS[retries];
+  if (wait === undefined) return waitingCard('Spojení se serverem spadlo.', true);
+  retries++;
+  waitingCard(`Spojení spadlo — vracím tě do zápasu (pokus ${retries} z ${RETRY_MS.length})…`);
+  setTimeout(openSocket, wait);
 }
 
 function handle(msg) {
+  retries = 0;   // po skutečném provozu, ne po pouhém otevření — jinak by flapping socket cyklil
   you = msg.you ?? you;
   switch (msg.type) {
     case 'state': return onState(msg);
@@ -105,7 +143,7 @@ function onState(msg) {
   if (msg.phase === 'waiting') waitingCard('Čekám na soupeře.', false, true);
   if (msg.phase === 'ready') readyCard(msg);
   if (msg.phase === 'countdown') { waitingCard(`${them?.nick ?? 'Soupeř'} je tu. Začínáme!`); prefetchNext(msg); }
-  if (msg.phase === 'paused') waitingCard('Soupeř se odpojil — čekám 15 vteřin.');
+  if (msg.phase === 'paused') waitingCard(`Soupeř se odpojil — čekám ${Math.ceil((msg.msLeft ?? 15000) / 1000)} vteřin.`);
   if (msg.phase === 'ended') waitingCard('Zápas už skončil.', true); // reload až po konci
   if (msg.phase === 'drawing') resumeRound(msg);
 }
@@ -223,6 +261,8 @@ function onReveal(msg) {
 function onEnd(msg) {
   board.timerStop();
   inRound = false;
+  closing = true;              // zápas skončil — návrat po výpadku už nedává smysl
+  clearInterval(pingTimer);
   $('duel-shot').hidden = true;
   $('duel-legend').hidden = true;
   const themId = Object.keys(msg.totals).find(id => id !== you);
@@ -241,9 +281,10 @@ function onEnd(msg) {
     <button class="btn btn-primary" id="again">Nový duel</button>
     <button class="link-btn" id="back">← zpět na začátek</button>
   `, () => {
-    $('again').onclick = () => { ws?.close(); sessionStorage.removeItem('pmg-duel-token'); location.href = '/?duel=new'; };
-    $('back').onclick = () => { ws?.close(); onLeave(); };
+    $('again').onclick = () => { sessionStorage.removeItem('pmg-duel-token'); location.href = '/?duel=new'; };
+    $('back').onclick = () => onLeave();
   });
+  ws?.close();   // dřív se jen zahodila reference a socket zůstal viset otevřený
   ws = null;
 }
 

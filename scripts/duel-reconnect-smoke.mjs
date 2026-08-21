@@ -51,8 +51,27 @@ else {
 }
 if (dropped) fails.push('close starého socketu zápas pauzl, i když byl nový připojený');
 
-a2.close(); b.close();
+// 2. výpadek sítě: socket spadne a hráč se vrací do grace okna. Opačné pořadí než
+// reload — nejdřív zmizí spojení, teprve pak se otevře nové.
+a2.close();
+await waitFor('b', m => m.type === 'state' && m.phase === 'paused', 5000)
+  .catch(() => fails.push('soupeř se nedozvěděl, že se zápas pauzuje'));
+const a3 = await open('a3', 'a'.repeat(16));
+await waitFor('a3', m => m.type === 'state' && m.phase === 'drawing', 5000)
+  .catch(() => fails.push('návrat do grace okna zápas nerozjel'));
+if (seen('a3', m => m.type === 'end')) fails.push('zápas skončil, i když se hráč vrátil včas');
+
+// 3. keepalive: MatchDO na ping odpovídá autoresponsem, bez probuzení objektu
+a3.send('{"type":"ping"}');
+await waitFor('a3', m => m.type === 'pong', 3000)
+  .catch(() => fails.push('server neodpověděl na ping — keepalive nefunguje'));
+
+a3.close(); b.close();
 console.log('kód:', code);
-console.log('a2:', log.filter(l => l.who === 'a2').map(l => l.msg.type === 'state' ? `state:${l.msg.phase}` : l.msg.type).join(' → '));
+const trace = who => log.filter(l => l.who === who)
+  .map(l => (l.msg.type === 'state' ? `state:${l.msg.phase}` : l.msg.type)).join(' → ');
+console.log('po reloadu  (a2):', trace('a2'));
+console.log('po výpadku  (a3):', trace('a3'));
+console.log('soupeř      (b) :', trace('b'));
 console.log(fails.length ? `CHYBA: ${fails.join('; ')}` : 'OK');
 process.exit(fails.length ? 1 : 0);
