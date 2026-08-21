@@ -1,5 +1,8 @@
 # Nasazení
 
+Produkce: <https://prague-metro-guesser.guth-jarkovsky-tomas.workers.dev>
+Admin: `/admin` (Basic Auth, na jménu nezáleží, heslo je secret `ADMIN_PASSWORD`)
+
 ## Běžný den
 
 ```
