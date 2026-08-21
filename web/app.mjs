@@ -1,6 +1,7 @@
 import { isoWeek, weeklyChallenge, practiceRounds, roundViewport } from './shared/seed.mjs';
 import { scoreRound } from './shared/scoring.mjs';
 import * as board from './board.mjs';
+import { initDuel, findOpponent, hostDuel, joinDuel } from './duel.mjs';
 
 const $ = id => document.getElementById(id);
 const overlay = $('overlay');
@@ -379,6 +380,32 @@ function showCard(staticHtml, wire) {
   wire?.(card);
 }
 
+initDuel({ card: showCard, leave: () => location.href = '/' });
+
+// nick musí být znám dřív než v duelu — soupeř ho vidí v čekárně
+function askNick(then) {
+  showCard(`
+    <p class="label">duel</p>
+    <h2>Jak ti mám říkat?</h2>
+    <input id="duel-nick" maxlength="16" placeholder="přezdívka (3–16 znaků)">
+    <p class="error" id="nick-err"></p>
+    <button class="btn btn-primary" id="go">Pokračovat</button>
+    <button class="link-btn" id="back">← zpět</button>
+  `, () => {
+    $('duel-nick').value = localStorage.getItem('pmg-nick') ?? '';
+    $('go').onclick = () => {
+      const nick = $('duel-nick').value.trim();
+      if (!/^[\p{L}\p{N} _-]{3,16}$/u.test(nick)) {
+        $('nick-err').textContent = 'Neplatná přezdívka (3–16 znaků)';
+        return;
+      }
+      localStorage.setItem('pmg-nick', nick);
+      then();
+    };
+    $('back').onclick = () => showIntro();
+  });
+}
+
 // ---------- úvod + tutoriál ----------
 function showIntro() {
   const played = localStorage.getItem(playedKey);
@@ -406,6 +433,8 @@ function showIntro() {
       : `<button class="btn btn-primary" id="warmup">Rozehřátí — ${ROUNDS} stanic na nečisto</button>
          <button class="btn btn-ghost" id="play">Rovnou týdenní výzva na ostro</button>`}
     <button class="link-btn" id="casual">casual mode — bez času, bez konce, bez zápisu</button>
+    <button class="link-btn" id="duel-find">duel proti někomu z fronty</button>
+    <button class="link-btn" id="duel-host">duel s kamarádem na odkaz</button>
   `, card => {
     if (played) {
       card.querySelector('#played-nick').textContent = played;
@@ -415,6 +444,8 @@ function showIntro() {
     }
     $('warmup').onclick = startWarmup;
     $('casual').onclick = startCasual;
+    $('duel-find').onclick = () => askNick(findOpponent);
+    $('duel-host').onclick = () => askNick(hostDuel);
   });
 }
 
@@ -454,3 +485,8 @@ function setBackdrop(station = null) {
 fetch('bg/CREDITS.json').then(r => r.json()).then(list => { photos = list; setBackdrop(bgStation); });
 board.setRound({ lat: 50.0755, lng: 14.4303, size: 600 }, 1);
 showIntro();
+
+// /?duel=K7P2M9 z odkazu od kamaráda, /?duel=new z tlačítka „Nový duel"
+const fromLink = new URLSearchParams(location.search).get('duel');
+if (fromLink === 'new') askNick(hostDuel);
+else if (fromLink) askNick(() => joinDuel(fromLink) || showIntro());
