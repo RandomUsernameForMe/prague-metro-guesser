@@ -44,3 +44,16 @@ CREATE TABLE IF NOT EXISTS guesses (
 );
 CREATE INDEX IF NOT EXISTS idx_guesses_station ON guesses(station_id);
 CREATE INDEX IF NOT EXISTS idx_guesses_created ON guesses(created_at);
+
+-- jeden řádek = jeden dohraný duel; zapisuje MatchDO na konci zápasu
+CREATE TABLE IF NOT EXISTS duels (
+  code TEXT PRIMARY KEY,        -- kód zápasu, zároveň jméno Durable Objectu
+  nick_a TEXT NOT NULL,
+  nick_b TEXT NOT NULL,
+  score_a INTEGER NOT NULL,
+  score_b INTEGER NOT NULL,
+  winner TEXT,                  -- 'a' | 'b' | NULL při remíze
+  ended_reason TEXT NOT NULL,   -- 'complete' | 'forfeit'
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_duels_created ON duels(created_at DESC);

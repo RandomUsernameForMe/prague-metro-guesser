@@ -9,3 +9,16 @@ directory = "./web"
 binding = "DB"
 database_name = "metro-guesser"
 database_id = "853881c9-743d-4803-88cb-71cf7cf98b72"
+
+[[durable_objects.bindings]]
+name = "MATCH"
+class_name = "MatchDO"
+
+[[durable_objects.bindings]]
+name = "LOBBY"
+class_name = "LobbyDO"
+
+# SQLite backend je podmínka pro Durable Objects na free plánu
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["MatchDO", "LobbyDO"]
