@@ -47,7 +47,6 @@ function connect(c, note) {
   ws.onclose = () => { board.timerStop(); waitingCard('Spojení se serverem spadlo.', true); };
   $('confirm').onclick = submit;   // v duelu potvrzení posílá tip, nevyhodnocuje kolo lokálně
   document.body.dataset.phase = 'duel';
-  document.body.dataset.mode = 'duel'; // karty duelu jsou žluté jako linka B
   $('duel').hidden = false;
   waitingCard(note ?? `Pošli kamarádovi odkaz — kód zápasu je ${code}.`);
 }

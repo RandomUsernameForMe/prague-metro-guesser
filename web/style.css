@@ -15,7 +15,7 @@
   --on-accent: #fff;
   --draw: #ff2d6f;         /* hráčova čára */
 
-  /* barva režimu — žije jen v úvodu a v kartách, mapa a panel drží barvu linky */
+  /* barva režimu — čte ji jen úvodní karta s výběrem režimu */
   --mode: var(--c);
   --on-mode: #fff;
 
@@ -213,7 +213,7 @@ body[data-phase='casual'] #controls { margin-top: auto; }
   background: transparent; color: var(--text);
   box-shadow: inset 0 0 0 1px var(--hairline);
 }
-.btn-outline:hover:not(:disabled) { box-shadow: inset 0 0 0 1px var(--mode); }
+.btn-outline:hover:not(:disabled) { box-shadow: inset 0 0 0 1px var(--accent); }
 .btn-outline svg { width: 17px; height: 17px; flex: none; }
 .link-btn {
   background: none; border: 0; color: var(--muted); cursor: pointer;
@@ -239,23 +239,22 @@ body[data-phase='casual'] #controls { margin-top: auto; }
   max-height: 100%;
   overflow-y: auto;
   background: linear-gradient(180deg, var(--alu-hi), var(--alu));
-  border-left: 4px solid var(--mode);
+  border-left: 4px solid var(--accent);
   padding: 32px;
   display: grid; gap: 16px;
   box-shadow: 0 30px 90px -30px #000;
   animation: rise 0.4s var(--ease);
   transition: border-color 0.3s var(--ease);
 }
-/* karta patří režimu, ne aktuální lince */
-.card .btn-primary { background: var(--mode); color: var(--on-mode); }
-.card .btn-primary:disabled { background: var(--hairline); color: var(--muted); }
+/* barva režimu žije jen ve výběru režimu — dál se všechno barví podle linky stanice */
+.card.intro { --accent: var(--mode); --on-accent: var(--on-mode); }
 .card h2 {
   font: 400 clamp(24px, 3vw, 34px)/1 Anton, sans-serif;
   text-transform: uppercase; letter-spacing: 0.02em;
 }
 .card p { color: var(--muted); font-size: 15px; }
 .card .big {
-  font: 400 64px/1 Anton, sans-serif; color: var(--mode);
+  font: 400 64px/1 Anton, sans-serif; color: var(--accent);
   font-variant-numeric: tabular-nums;
 }
 .card .btn { width: 100%; }
@@ -291,7 +290,7 @@ body[data-phase='casual'] #controls { margin-top: auto; }
 .steps b {
   display: grid; place-items: center;
   width: 30px; height: 30px; border-radius: 50%;
-  background: var(--mode); color: var(--on-mode);
+  background: var(--accent); color: var(--on-accent);
   font: 400 16px/1 Anton, sans-serif;
 }
 .steps span { color: var(--muted); }
@@ -301,21 +300,21 @@ body[data-phase='casual'] #controls { margin-top: auto; }
   padding: 14px; border: 1px solid var(--hairline);
   background: var(--concrete); color: var(--text); text-align: center;
 }
-.card input:focus { outline: 2px solid var(--mode); outline-offset: -2px; }
+.card input:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
 .card textarea {
   font: 500 15px/1.45 Archivo, sans-serif;
   padding: 14px; border: 1px solid var(--hairline);
   background: var(--concrete); color: var(--text);
   resize: vertical;
 }
-.card textarea:focus { outline: 2px solid var(--mode); outline-offset: -2px; }
+.card textarea:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
 .card ol.board { list-style: none; padding: 0; display: grid; gap: 2px; text-align: left; }
 .card ol.board li {
   display: grid; grid-template-columns: 28px 1fr auto; gap: 10px;
   padding: 9px 10px; background: rgba(255, 255, 255, 0.03);
   font-variant-numeric: tabular-nums;
 }
-.card ol.board li.me { background: color-mix(in srgb, var(--mode) 22%, transparent); font-weight: 800; }
+.card ol.board li.me { background: color-mix(in srgb, var(--accent) 22%, transparent); font-weight: 800; }
 .card ol.board .rank { color: var(--muted); }
 .error { color: #ff6b6b; font-size: 14px; min-height: 1em; }
 

@@ -351,7 +351,6 @@ function randomRound() {
 
 function startCasual() {
   mode = 'casual';
-  document.body.dataset.mode = 'casual';
   rounds = [randomRound()]; roundIdx = 0;
   startRound();
 }
@@ -359,7 +358,6 @@ function startCasual() {
 // rozehřátí: 10 stanic, které v týdenní výzvě nepadnou
 function startWarmup() {
   mode = 'warmup';
-  document.body.dataset.mode = 'standard'; // rozehřátí bydlí v tabu Standard, drží jeho barvu
   const weeklyIds = new Set(weeklyChallenge(week, stations).map(r => r.station.id));
   rounds = practiceRounds(stations, ROUNDS, weeklyIds);
   roundIdx = 0; totalScore = 0;
@@ -369,7 +367,6 @@ function startWarmup() {
 
 function startWeekly() {
   mode = 'weekly';
-  document.body.dataset.mode = 'standard';
   rounds = weeklyChallenge(week, stations);
   roundIdx = 0; totalScore = 0; lines = [];
   $('score-value').textContent = '0';
@@ -395,7 +392,6 @@ initDuel({ card: showCard, leave: () => location.href = '/' });
 
 // nick musí být znám dřív než v duelu — soupeř ho vidí v čekárně
 function askNick(then) {
-  document.body.dataset.mode = 'duel'; // sem se dá dojít i z odkazu ?duel=KÓD, ne jen z tabu
   showCard(`
     <p class="label">duel</p>
     <h2>Jak ti mám říkat?</h2>
@@ -482,6 +478,7 @@ function showIntro(tab = introTab) {
     </ol>
     <div class="cta">${introCta(tab, played)}</div>
   `, card => {
+    card.classList.add('intro'); // jediné místo, kde barví režim, ne linka
     if (switching) card.style.animation = 'none';
     card.querySelectorAll('.tab').forEach(t => {
       t.onclick = () => showIntro(t.dataset.tab);
