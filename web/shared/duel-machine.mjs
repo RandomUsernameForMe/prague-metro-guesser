@@ -9,6 +9,10 @@ export const ROUND_MS = { single: 20000, transfer: 30000 };
 
 export const roundMsFor = lineCount => (lineCount > 1 ? ROUND_MS.transfer : ROUND_MS.single);
 
+// tipy k odhalení: kdo v tomhle kole neodevzdal, má v guesses ještě tip z minulého kola
+export const guessesForRound = (guesses, i) => Object.fromEntries(
+  Object.entries(guesses).filter(([, g]) => g.i === i).map(([id, g]) => [id, g.lines]));
+
 // roundMs: pole délek kol v ms, jeho délka udává počet kol
 export function initialState(code, roundMs) {
   return {

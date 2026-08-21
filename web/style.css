@@ -14,6 +14,7 @@
   --accent: var(--c);      /* barva aktuální linky, přepisuje ji JS */
   --on-accent: #fff;
   --draw: #ff2d6f;         /* hráčova čára */
+  --rival: #35c8ff;        /* čára soupeře v duelu */
 
   /* barva režimu — čte ji jen úvodní karta s výběrem režimu */
   --mode: var(--c);
@@ -375,6 +376,17 @@ body[data-phase='casual'] #controls { margin-top: auto; }
 .duel-flag.waiting::before { content: 'kreslí…'; }
 .duel-flag.submitted::before { content: '✓ odevzdal'; }
 .duel-flag.gone::before { content: '⚠ odpojen'; }
+
+/* legenda kola: která čára v mapě je čí */
+.duel-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--muted); }
+.duel-legend[hidden] { display: none; }
+.duel-legend span::before {
+  content: ''; display: inline-block; vertical-align: middle;
+  width: 16px; height: 3px; margin-right: 6px; border-radius: 2px;
+  background: var(--swatch);
+}
+.duel-legend .mine { --swatch: var(--draw); }
+.duel-legend .rival { --swatch: var(--rival); }
 
 /* soupeř odevzdal — zbývá shot clock; barvou i pulzem jde o totéž varování jako u hodin */
 #duel-shot {

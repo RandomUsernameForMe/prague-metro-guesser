@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { initialState, reduce, COUNTDOWN_MS, SHOT_CLOCK_MS, REVEAL_MS, GRACE_MS, READY_MS } from '../web/shared/duel-machine.mjs';
+import { initialState, reduce, COUNTDOWN_MS, SHOT_CLOCK_MS, REVEAL_MS, GRACE_MS, READY_MS, guessesForRound } from '../web/shared/duel-machine.mjs';
 
 const NOW = 1_000_000;
 const ROUND_MS = [20000, 30000, 20000]; // tři kola, druhé je přestup
@@ -276,4 +276,10 @@ test('po konci zápasu už odpojení nic nemění', () => {
   const { state, effects } = reduce(end, { type: 'disconnect', playerId: 'a' }, end.deadline + 1000);
   assert.equal(state.phase, 'ended');
   assert.deepEqual(alarms(effects), []);
+});
+
+test('guessesForRound: odhalí jen tipy z právě skončeného kola', () => {
+  const guesses = { a: { i: 1, lines: [[[50, 14], [50, 14.1]]] }, b: { i: 0, lines: [[[50, 15], [50, 15.1]]] } };
+  assert.deepEqual(guessesForRound(guesses, 1), { a: guesses.a.lines });
+  assert.deepEqual(guessesForRound(guesses, 2), {});
 });

@@ -2,7 +2,7 @@ import stations from '../web/stations.json';
 import { weeklyChallenge, roundViewport, isoWeek } from '../web/shared/seed.mjs';
 import { scoreRound } from '../web/shared/scoring.mjs';
 import { validateRound } from '../web/shared/validate.mjs';
-import { initialState, reduce, roundMsFor } from '../web/shared/duel-machine.mjs';
+import { initialState, reduce, roundMsFor, guessesForRound } from '../web/shared/duel-machine.mjs';
 import { CODE_RE } from '../web/shared/code.mjs';
 
 const TOKEN_RE = /^[0-9a-f]{16}$/;
@@ -23,6 +23,7 @@ export class MatchDO {
     if (this.state) return;
     this.rounds = weeklyChallenge(code, stations);
     this.seats = (await this.ctx.storage.get('seats')) ?? {};
+    this.guesses = (await this.ctx.storage.get('guesses')) ?? {}; // seat → {i, lines} posledního tipu
     this.state = (await this.ctx.storage.get('state'))
       ?? initialState(code, this.rounds.map(r => roundMsFor(r.station.lines.length)));
   }
@@ -72,6 +73,9 @@ export class MatchDO {
     if (!v.ok) return;
     const complete = msg.lines.length === round.station.lines.length;
     const score = complete ? scoreRound(msg.lines, round.station).score : 0;
+    // tip se ukládá před apply — druhý submit hned spustí reveal, který ho posílá soupeři
+    this.guesses[seat] = { i: msg.i, lines: msg.lines };
+    await this.ctx.storage.put('guesses', this.guesses);
     await this.apply({ type: 'submit', playerId: seat, i: msg.i, score }, Date.now());
     await this.logGuess({ session, ip, round, i: msg.i, segments: msg.lines, score, complete });
   }
@@ -129,6 +133,7 @@ export class MatchDO {
     }
     if (out.type === 'reveal') {
       out.axes = this.rounds[out.i].station.axes;   // skutečné osy až po konci kola
+      out.guesses = guessesForRound(this.guesses, out.i); // i tipy soupeře — kolo skončilo, není co tajit
     }
     return out;
   }

@@ -118,6 +118,7 @@ function onRound(msg) {
   roundIdx = msg.i;
   iSubmitted = false;
   $('duel-shot').hidden = true;
+  $('duel-legend').hidden = true;
   overlay.hidden = true;
   $('station-name').textContent = msg.name;
   $('round-label').textContent = `kolo ${msg.i + 1} z 10 · ${msg.lines.length > 1
@@ -144,6 +145,20 @@ function submit() {
   ws?.send(JSON.stringify({ type: 'submit', i: roundIdx, lines: board.segments() }));
 }
 
+// legenda dává smysl jen když jsou v mapě obě čáry — soupeř mohl kolo prošvihnout
+function showLegend(hasRival) {
+  const el = $('duel-legend');
+  el.hidden = !hasRival;
+  if (!hasRival) return;
+  const chip = (cls, text) => {
+    const s = document.createElement('span');
+    s.className = cls;
+    s.textContent = text;   // nese nick soupeře → nikdy ne innerHTML
+    return s;
+  };
+  el.replaceChildren(chip('mine', 'tvůj tip'), chip('rival', $('duel-name').textContent));
+}
+
 function onOpponent(msg) {
   if (msg.id === you) return;
   $('duel-flag').className = `duel-flag ${!msg.connected ? 'gone' : msg.submitted ? 'submitted' : 'waiting'}`;
@@ -152,9 +167,11 @@ function onOpponent(msg) {
 function onReveal(msg) {
   board.timerStop();
   $('duel-shot').hidden = true;
-  board.revealAxes(msg.axes);
   $('duel-me').textContent = msg.totals[you].toLocaleString('cs');
   const themId = Object.keys(msg.totals).find(id => id !== you);
+  const rival = msg.guesses?.[themId];
+  board.revealAxes(msg.axes, rival);
+  showLegend(rival?.length > 0);
   $('duel-them').textContent = msg.totals[themId].toLocaleString('cs');
   const mine = msg.scores[you], theirs = msg.scores[themId];
   const verdict = mine === theirs ? 'Remíza v kole' : mine > theirs ? 'Kolo pro tebe' : 'Kolo pro soupeře';
@@ -169,6 +186,7 @@ function onReveal(msg) {
 function onEnd(msg) {
   board.timerStop();
   $('duel-shot').hidden = true;
+  $('duel-legend').hidden = true;
   const themId = Object.keys(msg.totals).find(id => id !== you);
   const verdict = msg.reason === 'noshow'
     ? (msg.winner === null ? 'Nikdo nepotvrdil — zápas zrušen'

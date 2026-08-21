@@ -111,9 +111,17 @@ const axesMarkup = (axes, animate) => axes.map(axis => {
             stroke-width="5" stroke-linecap="round"${reveal}/>`;
 }).join('');
 
-// dokreslí skutečné osy po potvrzení kola
-export function revealAxes(axes) {
-  redraw(axesMarkup(axes, true) + `<style>@keyframes reveal { to { stroke-dashoffset: 0; } }</style>`);
+// soupeřův tip: úsečky v lat/lng, čárkovaně a v jiné barvě než hráčova čára
+const rivalMarkup = segs => (segs ?? []).map(seg => {
+  const [[x1, y1], [x2, y2]] = seg.map(([lat, lng]) => latLngToPx(lat, lng, viewport, sizePx()));
+  return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--rival)" stroke-width="4"
+            stroke-linecap="round" stroke-dasharray="10 7" opacity="0.9"/>`;
+}).join('');
+
+// dokreslí skutečné osy po potvrzení kola, případně i tip soupeře
+export function revealAxes(axes, rival) {
+  redraw(rivalMarkup(rival) + axesMarkup(axes, true)
+    + `<style>@keyframes reveal { to { stroke-dashoffset: 0; } }</style>`);
 }
 
 // osy zůstanou pod dalším kreslením jako předloha (hráč opravuje chybnou stanici)
