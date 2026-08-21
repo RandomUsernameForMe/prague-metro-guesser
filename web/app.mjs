@@ -448,6 +448,30 @@ function showIntro() {
   });
 }
 
+// ---------- pozadí: fotky obkladů se střídají ----------
+function startBackdrop(photos) {
+  const layers = [document.createElement('div'), document.createElement('div')];
+  $('bg').append(...layers);
+  let i = Math.floor(Math.random() * photos.length), top = 0;
+  const show = () => {
+    const p = photos[i++ % photos.length];
+    const img = new Image(); // ukaž až po načtení, ať se neprolíná do prázdna
+    img.onload = () => {
+      const next = layers[top ^= 1];
+      next.style.backgroundImage = `url("bg/${p.file}")`;
+      next.classList.add('on');
+      layers[top ^ 1].classList.remove('on');
+      const credit = $('photo-credit');
+      credit.textContent = `foto ${p.author} / Wikimedia Commons, ${p.lic}`;
+      credit.href = p.page;
+    };
+    img.src = `bg/${p.file}`;
+  };
+  show();
+  setInterval(show, 14000);
+}
+
 // ---------- start ----------
+fetch('bg/CREDITS.json').then(r => r.json()).then(startBackdrop);
 renderTiles(tilesEl, { lat: 50.0755, lng: 14.4303 }, sizePx());
 showIntro();

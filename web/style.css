@@ -24,27 +24,25 @@ body {
   color: var(--text);
   font: 500 16px/1.45 Archivo, system-ui, sans-serif;
   overflow: hidden;
-  --lens: 128px; /* dlaždice = dvě čočky */
   background-color: color-mix(in srgb, var(--accent) 7%, var(--concrete));
-  background-image: var(--wall);
-  background-size: var(--lens) var(--lens);
   transition: background-color 0.6s var(--ease);
 }
 
-/* Obklad stanic linky A: střídavě vypouklé a vyduté čočky („prsa a antiprsa").
-   Obě čočky jsou v jedné dlaždici (vypouklá vlevo nahoře, vydutá vpravo dole),
-   takže všechny vrstvy sdílejí jednu velikost — --lens jde přebít per element. */
-:root {
-  /* poloměr max 24 % dlaždice — větší disk by přetekl dlaždici a ustřihl se */
-  --wall:
-    /* vypouklá: světlo u horní levé hrany, stín u dolní pravé */
-    radial-gradient(circle at 17% 17%, rgba(255, 255, 255, 0.26) 0 5%, rgba(255, 255, 255, 0) 16%),
-    radial-gradient(circle at 33% 33%, rgba(0, 0, 0, 0.38) 0 6%, rgba(0, 0, 0, 0) 17%),
-    radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.045) 0 23%, rgba(0, 0, 0, 0.16) 24%, rgba(0, 0, 0, 0) 25%),
-    /* vydutá: přesně obrácené stínování */
-    radial-gradient(circle at 83% 83%, rgba(255, 255, 255, 0.2) 0 5%, rgba(255, 255, 255, 0) 16%),
-    radial-gradient(circle at 67% 67%, rgba(0, 0, 0, 0.34) 0 6%, rgba(0, 0, 0, 0) 17%),
-    radial-gradient(circle at 75% 75%, rgba(255, 255, 255, 0.03) 0 23%, rgba(0, 0, 0, 0.14) 24%, rgba(0, 0, 0, 0) 25%);
+/* Pozadí: skutečné fotky obkladů stanic, střídají se (dvě vrstvy = prolínačka). */
+#bg { position: fixed; inset: 0; z-index: -1; background: var(--concrete); }
+#bg div {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center;
+  filter: saturate(0.7) brightness(0.4);
+  opacity: 0;
+  transition: opacity 1.6s var(--ease);
+}
+#bg div.on { opacity: 1; }
+/* nádech barvy aktuální linky, ať pozadí drží s panelem */
+#bg::after {
+  content: ''; position: absolute; inset: 0;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  transition: background 0.6s var(--ease);
 }
 
 /* ---------- layout ---------- */
@@ -68,18 +66,15 @@ body {
 #tiles img { transition: opacity 0.35s var(--ease); }
 #draw { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
 
-/* ---------- boční panel: hliníkový vaflový obklad ---------- */
+/* ---------- boční panel: matné sklo nad fotkou ---------- */
 #panel {
   position: relative;
   display: flex;
   flex-direction: column;
   gap: 26px;
   padding: 28px 26px 22px;
-  --lens: 104px;
-  background-color: color-mix(in srgb, var(--accent) 7%, var(--alu));
-  /* clona pod textem, ať obklad nekřičí do typografie */
-  background-image: linear-gradient(rgba(20, 24, 28, 0.62), rgba(20, 24, 28, 0.62)), var(--wall);
-  background-size: var(--lens) var(--lens);
+  background-color: color-mix(in srgb, var(--accent) 7%, color-mix(in srgb, var(--alu) 88%, transparent));
+  backdrop-filter: blur(22px) saturate(0.8);
   box-shadow: inset 0 70px 90px -70px rgba(255, 255, 255, 0.07),
               inset 0 -90px 100px -70px rgba(0, 0, 0, 0.4);
   border-left: 1px solid var(--hairline);
@@ -285,10 +280,11 @@ body[data-phase='casual'] #controls { margin-top: auto; }
 #hint[hidden] { display: none; }
 
 #attribution {
-  position: absolute; left: 0; bottom: 0; z-index: 4;
+  position: absolute; left: 0; bottom: 0; z-index: 11; /* nad overlay — licence fotek musí být vidět */
   font-size: 10px; letter-spacing: 0.04em; color: var(--muted);
   background: rgba(9, 11, 12, 0.6); padding: 4px 8px;
 }
+#attribution a { color: inherit; }
 
 /* ---------- mobil: panel pod mapu ---------- */
 @media (max-width: 900px), (orientation: portrait) {
