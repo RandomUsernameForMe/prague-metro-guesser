@@ -3,7 +3,7 @@ import stations from '../../web/stations.json';
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json' } });
 
-const MODES = new Set(['weekly', 'warmup', 'casual']);
+const MODES = new Set(['weekly', 'warmup', 'casual', 'duel']);
 const byId = new Map(stations.map(s => [s.id, s]));
 const round1 = n => (n === null ? null : Math.round(n * 10) / 10);
 

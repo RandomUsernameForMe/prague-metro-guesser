@@ -1,11 +1,16 @@
 import stations from '../web/stations.json';
-import { weeklyChallenge, roundViewport } from '../web/shared/seed.mjs';
+import { weeklyChallenge, roundViewport, isoWeek } from '../web/shared/seed.mjs';
 import { scoreRound } from '../web/shared/scoring.mjs';
 import { validateRound } from '../web/shared/validate.mjs';
 import { initialState, reduce, roundMsFor } from '../web/shared/duel-machine.mjs';
 import { CODE_RE } from '../web/shared/code.mjs';
 
 const TOKEN_RE = /^[0-9a-f]{16}$/;
+
+async function sha256(s) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
 export class MatchDO {
   constructor(ctx, env) {
@@ -52,7 +57,7 @@ export class MatchDO {
   }
 
   async webSocketMessage(ws, raw) {
-    const { seat, code } = ws.deserializeAttachment();
+    const { seat, code, session, ip } = ws.deserializeAttachment();
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
     if (msg.type !== 'submit') return;
@@ -66,6 +71,7 @@ export class MatchDO {
     const complete = msg.lines.length === round.station.lines.length;
     const score = complete ? scoreRound(msg.lines, round.station).score : 0;
     await this.apply({ type: 'submit', playerId: seat, i: msg.i, score }, Date.now());
+    await this.logGuess({ session, ip, round, i: msg.i, segments: msg.lines, score, complete });
   }
 
   async webSocketClose(ws) {
@@ -134,5 +140,23 @@ export class MatchDO {
          VALUES (?, ?, ?, ?, ?, ?, ?)`
       ).bind(this.state.code, nick(a), nick(b), totals[a] ?? 0, totals[b] ?? 0, winner, reason).run();
     } catch { /* výsledek v DB je bonus, zápas tím nepadá */ }
+  }
+
+  // stejný řádek jako /api/guess, jen ho zapisuje server sám — v duelu klient POST neposílá
+  async logGuess({ session, ip, round, i, segments, score, complete }) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(session ?? '')) return;
+    const r = complete ? scoreRound(segments, round.station) : null;
+    const ipHash = await sha256(ip ?? '');
+    try {
+      await this.env.DB.prepare(
+        `INSERT INTO guesses (session, mode, week, station_id, round_idx, u, v, segments_json,
+                              dist_m, score, per_line_json, ms, timed_out, forfeited, ip_hash)
+         VALUES (?, 'duel', ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)`
+      ).bind(
+        session, isoWeek(new Date()), round.station.id, i, round.u, round.v,
+        JSON.stringify(segments), r?.d ?? null, score, r ? JSON.stringify(r.perLine) : null,
+        complete ? 0 : 1, ipHash,
+      ).run();
+    } catch { /* statistika nesmí shodit zápas */ }
   }
 }

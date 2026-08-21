@@ -6,9 +6,11 @@ const base = (process.argv[2] ?? 'http://localhost:8787').replace(/^http/, 'ws')
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const code = Array.from({ length: 6 }, () => ALPHABET[Math.floor(Math.random() * 32)]).join('');
 const seen = { a: [], b: [] };
+// session musí být UUID, jinak MatchDO kolo do `guesses` nezapíše
+const session = crypto.randomUUID();
 
 const open = (who, token) => new Promise(resolve => {
-  const ws = new WebSocket(`${base}/api/duel/${code}?player=${token}&nick=${who}&session=`);
+  const ws = new WebSocket(`${base}/api/duel/${code}?player=${token}&nick=${who}&session=${session}`);
   ws.addEventListener('message', e => {
     const msg = JSON.parse(e.data);
     seen[who].push(msg.type);

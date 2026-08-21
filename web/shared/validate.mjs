@@ -4,7 +4,7 @@ import { toLocalMeters } from './geo.mjs';
 const NICK_RE = /^[\p{L}\p{N} _-]{3,16}$/u;
 const MARGIN = 5; // m tolerance na hraně výřezu
 const WEEK_RE = /^\d{4}-\d{2}$/;
-const MODES = ['weekly', 'warmup', 'casual'];
+const MODES = ['weekly', 'warmup', 'casual', 'duel'];
 const NOTE = { min: 3, max: 1000 };
 const PRAHA = { lat: [49.8, 50.3], lng: [14.0, 14.8] }; // hrubý rám, jen ať do DB nelezou nesmysly
 
