@@ -26,6 +26,9 @@
 body[data-mode='standard'] { --mode: var(--c); --on-mode: #fff; }
 body[data-mode='duel'] { --mode: var(--b); --on-mode: #1a1400; }
 body[data-mode='casual'] { --mode: var(--a); --on-mode: #fff; }
+/* Ve výběru režimu vede barva režimu celou obrazovku — panel, pozadí, karta.
+   Deklarace na body přebije --accent, který JS nastavuje na :root podle linky stanice. */
+body[data-phase='intro'] { --accent: var(--mode); --on-accent: var(--on-mode); }
 
 * { margin: 0; box-sizing: border-box; }
 
@@ -246,8 +249,6 @@ body[data-phase='casual'] #controls { margin-top: auto; }
   animation: rise 0.4s var(--ease);
   transition: border-color 0.3s var(--ease);
 }
-/* barva režimu žije jen ve výběru režimu — dál se všechno barví podle linky stanice */
-.card.intro { --accent: var(--mode); --on-accent: var(--on-mode); }
 .card h2 {
   font: 400 clamp(24px, 3vw, 34px)/1 Anton, sans-serif;
   text-transform: uppercase; letter-spacing: 0.02em;

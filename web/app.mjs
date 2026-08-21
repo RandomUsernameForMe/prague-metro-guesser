@@ -478,7 +478,6 @@ function showIntro(tab = introTab) {
     </ol>
     <div class="cta">${introCta(tab, played)}</div>
   `, card => {
-    card.classList.add('intro'); // jediné místo, kde barví režim, ne linka
     if (switching) card.style.animation = 'none';
     card.querySelectorAll('.tab').forEach(t => {
       t.onclick = () => showIntro(t.dataset.tab);
