@@ -14,6 +14,7 @@ let pressing = false;
 let required = 1;
 let viewport = null;
 let onChange = null;
+let axesExtra = '';     // osy, které mají zůstat i pod dalším kreslením
 
 export const sizePx = () => stage.clientWidth;
 export const count = () => segs.length;
@@ -29,7 +30,7 @@ const segMarkup = ([[x1, y1], [x2, y2]], preview = false) =>
      stroke-linecap="round"${preview ? ' stroke-dasharray="8 6" opacity="0.85"' : ''}/>` +
   `<circle cx="${x1}" cy="${y1}" r="5" fill="var(--draw)"/><circle cx="${x2}" cy="${y2}" r="5" fill="var(--draw)"/>`;
 
-export function redraw(extra = '') {
+export function redraw(extra = axesExtra) {
   // jen číselné souřadnice z kliků — žádná externí data
   const markup = segs.map(s => segMarkup(s)).join('')
     + (anchor && cursor ? segMarkup([anchor, cursor], true) : '')
@@ -80,6 +81,7 @@ export function onSegmentsChange(cb) { onChange = cb; }
 export function setRound(vp, req) {
   viewport = vp;
   required = req;
+  axesExtra = '';
   segs = []; anchor = cursor = null;
   renderTiles(tilesEl, vp, sizePx());
   redraw();
@@ -99,14 +101,25 @@ export function maybeShowHint() {
   hintEl.hidden = false;
 }
 
-// dokreslí skutečné osy, každou v barvě své linky
+// osy stanice, každá v barvě své linky; animate = najet zleva doprava
+const axesMarkup = (axes, animate) => axes.map(axis => {
+  const pts = axis.pts.map(([lat, lng]) => latLngToPx(lat, lng, viewport, sizePx()).join(',')).join(' ');
+  const reveal = animate
+    ? ' stroke-dasharray="1000" stroke-dashoffset="1000" style="animation: reveal 1s forwards"'
+    : ' opacity="0.5"'; // jen reference pod kreslením — nesmí přebít hráčovu úsečku
+  return `<polyline points="${pts}" fill="none" stroke="var(--${axis.line.toLowerCase()})"
+            stroke-width="5" stroke-linecap="round"${reveal}/>`;
+}).join('');
+
+// dokreslí skutečné osy po potvrzení kola
 export function revealAxes(axes) {
-  const s = sizePx();
-  const markup = axes.map(axis => {
-    const pts = axis.pts.map(([lat, lng]) => latLngToPx(lat, lng, viewport, s).join(',')).join(' ');
-    return `<polyline points="${pts}" fill="none" stroke="var(--${axis.line.toLowerCase()})" stroke-width="5" stroke-linecap="round" stroke-dasharray="1000" stroke-dashoffset="1000" style="animation: reveal 1s forwards"/>`;
-  }).join('');
-  redraw(markup + `<style>@keyframes reveal { to { stroke-dashoffset: 0; } }</style>`);
+  redraw(axesMarkup(axes, true) + `<style>@keyframes reveal { to { stroke-dashoffset: 0; } }</style>`);
+}
+
+// osy zůstanou pod dalším kreslením jako předloha (hráč opravuje chybnou stanici)
+export function keepAxes(axes) {
+  axesExtra = axes ? axesMarkup(axes, false) : '';
+  redraw();
 }
 
 // ---------- odpočet ----------

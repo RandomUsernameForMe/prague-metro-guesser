@@ -13,10 +13,12 @@ CREATE INDEX IF NOT EXISTS idx_scores_week ON scores(week, score DESC);
 CREATE TABLE IF NOT EXISTS reports (
   station_id TEXT NOT NULL,
   station_name TEXT NOT NULL,   -- jak se stanice jmenovala v době hlášení
-  note TEXT NOT NULL,           -- jak to podle hráče má být správně
+  note TEXT NOT NULL,           -- komentář hráče; prázdný, když jen zakreslil osu
   mode TEXT NOT NULL,
   week TEXT NOT NULL,
-  segments_json TEXT,           -- úsečky, které hráč nakreslil; NULL u propadlého kola
+  segments_json TEXT,           -- úsečky, které hráč nakreslil v kole; NULL u propadlého kola
+  fix_json TEXT,                -- kudy podle hráče osa vede doopravdy; NULL = jen slovní hlášení
+  -- migrace existující DB: ALTER TABLE reports ADD COLUMN fix_json TEXT;
   ip_hash TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
