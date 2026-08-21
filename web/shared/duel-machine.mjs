@@ -51,11 +51,14 @@ export function reduce(state, event, now) {
     case 'join': return join(s, event, now, fx);
     case 'timeout': return timeout(s, now, fx);
     case 'submit': return submit(s, event, now, fx);
+    case 'disconnect': return disconnect(s, event, now, fx);
+    case 'reconnect': return reconnect(s, event, now, fx);
     default: return { state, effects: fx };
   }
 }
 
 function join(s, { playerId, nick }, now, fx) {
+  if (s.players[playerId]) return reconnect(s, { playerId }, now, fx); // návrat po výpadku
   if (s.order.length >= 2) {
     fx.push(send(playerId, { type: 'error', error: 'full' }));
     return { state: s, effects: fx };
@@ -79,8 +82,40 @@ function timeout(s, now, fx) {
       return s.roundIndex + 1 < s.roundMs.length
         ? startRound(s, s.roundIndex + 1, now, fx)
         : end(s, 'complete', fx);
+    case 'paused': return end(s, 'forfeit', fx);
     default: return { state: s, effects: fx };
   }
+}
+
+function disconnect(s, { playerId }, now, fx) {
+  const p = s.players[playerId];
+  if (!p || s.phase === 'ended') return { state: s, effects: fx };
+  p.connected = false;
+  // ve waiting není co pauzovat ani komu kontumovat — soupeř ještě nedorazil
+  if (s.phase !== 'paused' && s.phase !== 'waiting') {
+    s.pausedPhase = s.phase;
+    s.pausedRemainingMs = Math.max(0, s.deadline - now); // hodiny stojí, dokud se nevrátí
+    s.phase = 'paused';
+    s.deadline = now + GRACE_MS;
+    fx.push(alarm(s.deadline));
+  }
+  fx.push(send('all', { type: 'opponent', id: playerId, connected: false, submitted: p.submitted }));
+  return { state: s, effects: fx };
+}
+
+function reconnect(s, { playerId }, now, fx) {
+  const p = s.players[playerId];
+  if (!p) return { state: s, effects: fx };
+  p.connected = true;
+  if (s.phase === 'paused' && s.order.every(id => s.players[id].connected)) {
+    s.phase = s.pausedPhase;
+    s.deadline = now + s.pausedRemainingMs;
+    s.pausedPhase = null;
+    s.pausedRemainingMs = 0;
+    fx.push(alarm(s.deadline));
+  }
+  fx.push(send('all', stateMsg(s)));
+  return { state: s, effects: fx };
 }
 
 function end(s, reason, fx) {

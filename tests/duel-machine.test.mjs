@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { initialState, reduce, COUNTDOWN_MS, SHOT_CLOCK_MS, REVEAL_MS } from '../web/shared/duel-machine.mjs';
+import { initialState, reduce, COUNTDOWN_MS, SHOT_CLOCK_MS, REVEAL_MS, GRACE_MS } from '../web/shared/duel-machine.mjs';
 
 const NOW = 1_000_000;
 const ROUND_MS = [20000, 30000, 20000]; // tři kola, druhé je přestup
@@ -164,4 +164,63 @@ test('shodné součty znamenají remízu', () => {
   const end = playOut(drawing(), { a: [500, 0, 0], b: [500, 0, 0] });
   assert.equal(end.winner, null);
   assert.equal(end.reason, 'complete');
+});
+
+test('odpojení uprostřed kola zápas pauzne a nastaví grace', () => {
+  const s = drawing();
+  const t = s.deadline - 8000; // do konce kola zbývá 8 s
+  const { state, effects } = reduce(s, { type: 'disconnect', playerId: 'b' }, t);
+  assert.equal(state.phase, 'paused');
+  assert.equal(state.pausedPhase, 'drawing');
+  assert.equal(state.pausedRemainingMs, 8000);
+  assert.equal(state.deadline, t + GRACE_MS);
+  assert.equal(state.players.b.connected, false);
+  assert.deepEqual(alarms(effects), [t + GRACE_MS]);
+});
+
+test('návrat do patnácti sekund vrátí zbytek času, ne nových pět', () => {
+  const s = drawing();
+  const t = s.deadline - 8000;
+  const paused = reduce(s, { type: 'disconnect', playerId: 'b' }, t).state;
+  const back = t + 10000; // vrátil se po 10 s
+  const { state, effects } = reduce(paused, { type: 'reconnect', playerId: 'b' }, back);
+  assert.equal(state.phase, 'drawing');
+  assert.equal(state.players.b.connected, true);
+  assert.equal(state.deadline, back + 8000, 'hodiny stály, zbývá pořád 8 s');
+  assert.deepEqual(alarms(effects), [back + 8000]);
+});
+
+test('ticho po celou grace znamená kontumaci ve prospěch připojeného', () => {
+  const s = drawing();
+  const t = s.deadline - 8000;
+  const paused = reduce(s, { type: 'disconnect', playerId: 'b' }, t).state;
+  const { state, effects } = reduce(paused, { type: 'timeout' }, paused.deadline);
+  assert.equal(state.phase, 'ended');
+  assert.equal(state.reason, 'forfeit');
+  assert.equal(state.winner, 'a');
+  assert.ok(effects.some(e => e.type === 'finish' && e.reason === 'forfeit'));
+});
+
+test('odpojení hráče čekajícího na soupeře nic nepauzuje', () => {
+  const alone = join(fresh(), 'a', 'Ada').state;
+  const { state, effects } = reduce(alone, { type: 'disconnect', playerId: 'a' }, NOW + 5000);
+  assert.equal(state.phase, 'waiting');
+  assert.deepEqual(alarms(effects), [], 'prázdný zápas se nemá komu kontumovat');
+  assert.equal(state.players.a.connected, false);
+});
+
+test('návrat známého hráče přes join se chová jako reconnect', () => {
+  const s = drawing();
+  const t = s.deadline - 8000;
+  const paused = reduce(s, { type: 'disconnect', playerId: 'b' }, t).state;
+  const { state } = reduce(paused, { type: 'join', playerId: 'b', nick: 'Bob' }, t + 1000);
+  assert.equal(state.phase, 'drawing');
+  assert.equal(state.order.length, 2, 'nesmí vzniknout třetí hráč');
+});
+
+test('po konci zápasu už odpojení nic nemění', () => {
+  const end = playOut(drawing(), { a: [1, 1, 1], b: [2, 2, 2] });
+  const { state, effects } = reduce(end, { type: 'disconnect', playerId: 'a' }, end.deadline + 1000);
+  assert.equal(state.phase, 'ended');
+  assert.deepEqual(alarms(effects), []);
 });
