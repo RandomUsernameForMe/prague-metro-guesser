@@ -1,58 +1,50 @@
 [
  {
   "file": "namesti-miru.webp",
+  "station": "Náměstí Míru",
   "author": "VitVit",
   "lic": "CC BY-SA 4.0",
   "page": "https://commons.wikimedia.org/wiki/File:Metro_A_N%C3%A1m%C4%9Bst%C3%AD_m%C3%ADru_n%C3%A1pis.jpg",
   "title": "Metro A Náměstí míru nápis.jpg"
  },
  {
-  "file": "namesti-miru-vlak.webp",
-  "author": "Firipu",
+  "file": "jiriho-z-podebrad.webp",
+  "station": "Jiřího z Poděbrad",
+  "author": "Bilykralik16",
   "lic": "CC BY-SA 4.0",
-  "page": "https://commons.wikimedia.org/wiki/File:Prague_Metro.JPG",
-  "title": "Prague Metro.JPG"
+  "page": "https://commons.wikimedia.org/wiki/File:Ji%C5%99%C3%ADho_z_Pod%C4%9Bbrad,_n%C3%A1zev_stanice.jpg",
+  "title": "Jiřího z Poděbrad, název stanice.jpg"
  },
  {
-  "file": "flora.webp",
+  "file": "malostranska.webp",
+  "station": "Malostranská",
   "author": "VitVit",
   "lic": "CC BY-SA 4.0",
-  "page": "https://commons.wikimedia.org/wiki/File:Metro_Flora_kolej.jpg",
-  "title": "Metro Flora kolej.jpg"
+  "page": "https://commons.wikimedia.org/wiki/File:Metro_Malostransk%C3%A1_st%C4%9Bna.jpg",
+  "title": "Metro Malostranská stěna.jpg"
  },
  {
-  "file": "obklad-cerveny.webp",
-  "author": "jsamwrites",
-  "lic": "CC BY-SA 4.0",
-  "page": "https://commons.wikimedia.org/wiki/File:Metro,_Prague.jpg",
-  "title": "Metro, Prague.jpg"
+  "file": "malostranska-stribrna.webp",
+  "station": "Malostranská",
+  "author": "MOs810",
+  "lic": "CC BY 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Metro_Praha_Malostranska.jpg",
+  "title": "Metro Praha Malostranska.jpg"
  },
  {
-  "file": "staromestska-obklad.webp",
+  "file": "staromestska.webp",
+  "station": "Staroměstská",
   "author": "Aktron",
   "lic": "CC BY 3.0",
   "page": "https://commons.wikimedia.org/wiki/File:Praha,_Star%C3%A9_m%C4%9Bsto,_Starom%C4%9Bstsk%C3%A1,_obklad.jpg",
   "title": "Praha, Staré město, Staroměstská, obklad.jpg"
  },
  {
-  "file": "staromestska.webp",
-  "author": "Gordilla",
-  "lic": "CC BY-SA 3.0",
-  "page": "https://commons.wikimedia.org/wiki/File:Station_de_m%C3%A9tro_%C3%A0_Prague.jpg",
-  "title": "Station de métro à Prague.jpg"
- },
- {
-  "file": "malostranska.webp",
-  "author": "Šimisborec",
+  "file": "obklad-zlaty.webp",
+  "station": null,
+  "author": "jsamwrites",
   "lic": "CC BY-SA 4.0",
-  "page": "https://commons.wikimedia.org/wiki/File:Malostransk%C3%A1_station_Prague_metro.jpg",
-  "title": "Malostranská station Prague metro.jpg"
- },
- {
-  "file": "hradcanska.webp",
-  "author": "VitVit",
-  "lic": "CC BY-SA 4.0",
-  "page": "https://commons.wikimedia.org/wiki/File:Hrad%C4%8Dansk%C3%A1_metro_1.jpg",
-  "title": "Hradčanská metro 1.jpg"
+  "page": "https://commons.wikimedia.org/wiki/File:Metro,_Prague.jpg",
+  "title": "Metro, Prague.jpg"
  }
 ]

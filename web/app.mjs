@@ -146,6 +146,7 @@ function paintPanel() {
   const st = rounds[roundIdx].station;
   document.documentElement.style.setProperty('--accent', `var(--${st.lines[0].toLowerCase()})`);
   document.documentElement.style.setProperty('--on-accent', st.lines[0] === 'B' ? '#1a1400' : '#fff');
+  setBackdrop(st.name);
   $('station-name').textContent = st.name;
   $('line-badges').replaceChildren(...st.lines.map(l => {
     const b = document.createElement('span');
@@ -495,6 +496,7 @@ function showIntro() {
   const played = localStorage.getItem(playedKey);
   stopTimer();
   document.body.dataset.phase = 'intro';
+  setBackdrop(); // úvod dostane fotku bez stanice
   $('station-name').textContent = 'Kde vede metro?';
   $('line-badges').replaceChildren();
   $('round-label').textContent = 'týdenní výzva o 10 stanicích';
@@ -528,30 +530,39 @@ function showIntro() {
   });
 }
 
-// ---------- pozadí: fotky obkladů se střídají ----------
-function startBackdrop(photos) {
-  const layers = [document.createElement('div'), document.createElement('div')];
-  $('bg').append(...layers);
-  let i = Math.floor(Math.random() * photos.length), top = 0;
-  const show = () => {
-    const p = photos[i++ % photos.length];
-    const img = new Image(); // ukaž až po načtení, ať se neprolíná do prázdna
-    img.onload = () => {
-      const next = layers[top ^= 1];
-      next.style.backgroundImage = `url("bg/${p.file}")`;
-      next.classList.add('on');
-      layers[top ^ 1].classList.remove('on');
-      const credit = $('photo-credit');
-      credit.textContent = `foto ${p.author} / Wikimedia Commons, ${p.lic}`;
-      credit.href = p.page;
-    };
-    img.src = `bg/${p.file}`;
+// ---------- pozadí: jedna fotka obkladu na stanici ----------
+const bgLayers = [document.createElement('div'), document.createElement('div')];
+$('bg').append(...bgLayers);
+let photos = [], bgStation = null, bgFile = null, bgTop = 0;
+
+// stanice si drží svou fotku po celé kolo; kde fotku dané stanice máme, ukážeme ji
+function pickPhoto(station) {
+  const own = photos.find(p => p.station === station);
+  if (own) return own;
+  const sum = [...(station || '')].reduce((a, c) => a + c.codePointAt(0), 0);
+  return photos[sum % photos.length];
+}
+
+function setBackdrop(station = null) {
+  bgStation = station;
+  if (!photos.length) return; // fotky se ještě stahují, dožene to fetch níž
+  const p = pickPhoto(station);
+  if (p.file === bgFile) return;
+  bgFile = p.file;
+  const img = new Image(); // ukaž až po načtení, ať se neprolíná do prázdna
+  img.onload = () => {
+    const next = bgLayers[bgTop ^= 1];
+    next.style.backgroundImage = `url("bg/${p.file}")`;
+    next.classList.add('on');
+    bgLayers[bgTop ^ 1].classList.remove('on');
+    const credit = $('photo-credit');
+    credit.textContent = `foto ${p.author} / Wikimedia Commons, ${p.lic}`;
+    credit.href = p.page;
   };
-  show();
-  setInterval(show, 14000);
+  img.src = `bg/${p.file}`;
 }
 
 // ---------- start ----------
-fetch('bg/CREDITS.json').then(r => r.json()).then(startBackdrop);
+fetch('bg/CREDITS.json').then(r => r.json()).then(list => { photos = list; setBackdrop(bgStation); });
 renderTiles(tilesEl, { lat: 50.0755, lng: 14.4303 }, sizePx());
 showIntro();
