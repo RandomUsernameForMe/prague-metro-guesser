@@ -56,7 +56,8 @@ test('practiceRounds: nespadne, když je stanic míň než kol', () => {
 });
 
 test('roundViewport: u=0.15 → střed 210 m východně od stanice', () => {
-  const st = { lat: 50.0, lng: 14.4 };
+  // výřez se centruje na osy, ne na node — tady mají střed přesně v lat/lng stanice
+  const st = { lat: 50.0, lng: 14.4, axes: [{ line: 'C', pts: [[49.999, 14.4], [50.001, 14.4]] }] };
   const vp = roundViewport({ station: st, u: 0.15, v: 0.5 });
   assert.ok(Math.abs((vp.lng - st.lng) * 111320 * Math.cos(Math.PI * 50 / 180) - 210) < 1);
   assert.ok(Math.abs(vp.lat - st.lat) < 1e-9);

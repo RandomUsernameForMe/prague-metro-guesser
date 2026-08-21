@@ -41,7 +41,8 @@ export function weeklyChallenge(week, stations) {
     const j = Math.floor(rng() * (i + 1));
     [chosen[i], chosen[j]] = [chosen[j], chosen[i]];
   }
-  return chosen.map(station => ({ station, u: 0.15 + rng() * 0.7, v: 0.15 + rng() * 0.7 }));
+  // 0.2–0.8: i nejdelší osa (~180 m) se vejde do výřezu celá
+  return chosen.map(station => ({ station, u: 0.2 + rng() * 0.6, v: 0.2 + rng() * 0.6 }));
 }
 
 // náhodná kola mimo zadané stanice — rozehřátí nesmí prozradit týdenní výzvu
@@ -53,17 +54,32 @@ export function practiceRounds(stations, count, excludeIds = new Set()) {
   }
   return picked.map(station => ({
     station,
-    u: 0.15 + Math.random() * 0.7,
-    v: 0.15 + Math.random() * 0.7,
+    u: 0.2 + Math.random() * 0.6,
+    v: 0.2 + Math.random() * 0.6,
   }));
+}
+
+// střed podle os, ne podle nodu stanice — v OSM node občas sedí u vestibulu (Křižíkova: 85 m vedle)
+function axisCenter(station) {
+  const pts = station.axes.flatMap(a => a.pts);
+  return {
+    lat: pts.reduce((s, p) => s + p[0], 0) / pts.length,
+    lng: pts.reduce((s, p) => s + p[1], 0) / pts.length,
+  };
 }
 
 // u = zlomek zleva, v = zlomek shora, kde ve výřezu leží stanice
 export function roundViewport(round) {
   const { station, u, v } = round;
+  const c = axisCenter(station);
+  // posun od středu se osekne tak, aby osy zůstaly celé ve výřezu (Můstek: nástupiště 200 m od sebe)
+  const pts = station.axes.flatMap(a => a.pts);
+  const half = (get, m) => Math.max(...pts.map(p => Math.abs(get(p)) * m));
+  const room = d => Math.max(0, 0.5 - d / VIEW_SIZE);
+  const clamp = (t, d) => Math.min(Math.max(t, 0.5 - room(d)), 0.5 + room(d));
   return {
-    lat: station.lat + ((v - 0.5) * VIEW_SIZE) / M_PER_DEG_LAT,
-    lng: station.lng + ((0.5 - u) * VIEW_SIZE) / mPerDegLng(station.lat),
+    lat: c.lat + ((clamp(v, half(p => p[0] - c.lat, M_PER_DEG_LAT)) - 0.5) * VIEW_SIZE) / M_PER_DEG_LAT,
+    lng: c.lng + ((0.5 - clamp(u, half(p => p[1] - c.lng, mPerDegLng(c.lat)))) * VIEW_SIZE) / mPerDegLng(c.lat),
     size: VIEW_SIZE,
   };
 }
