@@ -75,8 +75,32 @@ function timeout(s, now, fx) {
   switch (s.phase) {
     case 'countdown': return startRound(s, 0, now, fx);
     case 'drawing': return endRound(s, now, fx);
+    case 'reveal':
+      return s.roundIndex + 1 < s.roundMs.length
+        ? startRound(s, s.roundIndex + 1, now, fx)
+        : end(s, 'complete', fx);
     default: return { state: s, effects: fx };
   }
+}
+
+function end(s, reason, fx) {
+  const totals = {};
+  for (const id of s.order) totals[id] = s.players[id].total;
+  s.phase = 'ended';
+  s.deadline = 0;
+  s.reason = reason;
+  if (reason === 'forfeit') {
+    s.winner = s.order.find(id => s.players[id].connected) ?? null;
+  } else {
+    const [a, b] = s.order;
+    s.winner = totals[a] === totals[b] ? null : totals[a] > totals[b] ? a : b;
+  }
+  fx.push(
+    alarm(null),
+    send('all', { type: 'end', totals, winner: s.winner, reason }),
+    { type: 'finish', totals, winner: s.winner, reason },
+  );
+  return { state: s, effects: fx };
 }
 
 function startRound(s, i, now, fx) {

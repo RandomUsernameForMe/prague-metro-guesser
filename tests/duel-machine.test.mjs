@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { initialState, reduce, COUNTDOWN_MS, SHOT_CLOCK_MS } from '../web/shared/duel-machine.mjs';
+import { initialState, reduce, COUNTDOWN_MS, SHOT_CLOCK_MS, REVEAL_MS } from '../web/shared/duel-machine.mjs';
 
 const NOW = 1_000_000;
 const ROUND_MS = [20000, 30000, 20000]; // tři kola, druhé je přestup
@@ -98,4 +98,70 @@ test('když odevzdají oba, kolo končí hned', () => {
   assert.deepEqual(state.players.a.total, 800);
   assert.deepEqual(state.players.b.total, 500);
   assert.ok(sent(effects).some(m => m.type === 'reveal' && m.scores.a === 800 && m.totals.b === 500));
+});
+
+// dohraje zápas od zadaného stavu: v každém kole dostane 'a' skóre z scores.a[i], 'b' z scores.b[i]
+const playOut = (s, scores) => {
+  let cur = s;
+  for (let i = cur.roundIndex; i < ROUND_MS.length; i++) {
+    const t = cur.deadline - 1000;
+    cur = reduce(cur, { type: 'submit', playerId: 'a', i, score: scores.a[i] }, t).state;
+    cur = reduce(cur, { type: 'submit', playerId: 'b', i, score: scores.b[i] }, t).state;
+    cur = reduce(cur, { type: 'timeout' }, cur.deadline).state; // konec reveal
+  }
+  return cur;
+};
+
+test('vypršení času v kole zavře kolo a kdo neodevzdal, má nulu', () => {
+  const s = drawing();
+  const one = reduce(s, { type: 'submit', playerId: 'a', i: 0, score: 700 }, s.deadline - 10000).state;
+  const { state } = reduce(one, { type: 'timeout' }, one.deadline);
+  assert.equal(state.phase, 'reveal');
+  assert.equal(state.players.a.total, 700);
+  assert.equal(state.players.b.total, 0);
+});
+
+test('konec odhalení spustí další kolo s délkou podle typu stanice', () => {
+  const s = drawing();
+  const t = s.deadline - 5000;
+  const both = reduce(reduce(s, { type: 'submit', playerId: 'a', i: 0, score: 1 }, t).state,
+    { type: 'submit', playerId: 'b', i: 0, score: 2 }, t).state;
+  assert.equal(both.deadline, t + REVEAL_MS);
+  const { state } = reduce(both, { type: 'timeout' }, both.deadline);
+  assert.equal(state.phase, 'drawing');
+  assert.equal(state.roundIndex, 1);
+  assert.equal(state.deadline, both.deadline + ROUND_MS[1], 'druhé kolo je přestup → 30 s');
+});
+
+test('po posledním odhalení zápas končí a vyhrává vyšší součet', () => {
+  const end = playOut(drawing(), { a: [100, 100, 100], b: [900, 0, 0] });
+  assert.equal(end.phase, 'ended');
+  assert.equal(end.reason, 'complete');
+  assert.equal(end.winner, 'b');
+  assert.equal(end.players.a.total, 300);
+  assert.equal(end.players.b.total, 900);
+});
+
+test('konec zápasu vydá efekt finish a zruší alarm', () => {
+  let cur = drawing();
+  for (let i = 0; i < ROUND_MS.length - 1; i++) {
+    const t = cur.deadline - 1000;
+    cur = reduce(cur, { type: 'submit', playerId: 'a', i, score: 10 }, t).state;
+    cur = reduce(cur, { type: 'submit', playerId: 'b', i, score: 20 }, t).state;
+    cur = reduce(cur, { type: 'timeout' }, cur.deadline).state;
+  }
+  const t = cur.deadline - 1000;
+  cur = reduce(cur, { type: 'submit', playerId: 'a', i: 2, score: 10 }, t).state;
+  cur = reduce(cur, { type: 'submit', playerId: 'b', i: 2, score: 20 }, t).state;
+  const { state, effects } = reduce(cur, { type: 'timeout' }, cur.deadline);
+  assert.equal(state.phase, 'ended');
+  assert.deepEqual(alarms(effects), [null]);
+  const finish = effects.find(e => e.type === 'finish');
+  assert.deepEqual(finish, { type: 'finish', totals: { a: 30, b: 60 }, winner: 'b', reason: 'complete' });
+});
+
+test('shodné součty znamenají remízu', () => {
+  const end = playOut(drawing(), { a: [500, 0, 0], b: [500, 0, 0] });
+  assert.equal(end.winner, null);
+  assert.equal(end.reason, 'complete');
 });
