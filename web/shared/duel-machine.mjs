@@ -49,6 +49,8 @@ export function reduce(state, event, now) {
   const fx = [];
   switch (event.type) {
     case 'join': return join(s, event, now, fx);
+    case 'timeout': return timeout(s, now, fx);
+    case 'submit': return submit(s, event, now, fx);
     default: return { state, effects: fx };
   }
 }
@@ -66,5 +68,58 @@ function join(s, { playerId, nick }, now, fx) {
     fx.push(alarm(s.deadline));
   }
   fx.push(send('all', stateMsg(s)));
+  return { state: s, effects: fx };
+}
+
+function timeout(s, now, fx) {
+  switch (s.phase) {
+    case 'countdown': return startRound(s, 0, now, fx);
+    case 'drawing': return endRound(s, now, fx);
+    default: return { state: s, effects: fx };
+  }
+}
+
+function startRound(s, i, now, fx) {
+  s.phase = 'drawing';
+  s.roundIndex = i;
+  s.deadline = now + s.roundMs[i];
+  for (const id of s.order) {
+    s.players[id].submitted = false;
+    s.players[id].score = 0;
+  }
+  fx.push(alarm(s.deadline), send('all', { type: 'round', i, deadline: s.deadline }));
+  return { state: s, effects: fx };
+}
+
+function submit(s, { playerId, i, score }, now, fx) {
+  const p = s.players[playerId];
+  // pozdní, duplicitní i cizí kolo se tiše zahodí — kolo je pak za 0
+  if (s.phase !== 'drawing' || i !== s.roundIndex || !p || p.submitted || now > s.deadline) {
+    return { state: s, effects: fx };
+  }
+  p.submitted = true;
+  p.score = score;
+  if (s.order.every(id => s.players[id].submitted)) return endRound(s, now, fx);
+
+  s.deadline = Math.min(s.deadline, now + SHOT_CLOCK_MS); // min, jinak by pozdní tip čas přidal
+  fx.push(
+    alarm(s.deadline),
+    send('all', { type: 'opponent', id: playerId, connected: p.connected, submitted: true }),
+    send('all', { type: 'deadline', i, deadline: s.deadline }),
+  );
+  return { state: s, effects: fx };
+}
+
+function endRound(s, now, fx) {
+  const scores = {}, totals = {};
+  for (const id of s.order) {
+    const p = s.players[id];
+    p.total += p.score;   // kdo neodevzdal, má score 0 z startRound
+    scores[id] = p.score;
+    totals[id] = p.total;
+  }
+  s.phase = 'reveal';
+  s.deadline = now + REVEAL_MS;
+  fx.push(alarm(s.deadline), send('all', { type: 'reveal', i: s.roundIndex, scores, totals }));
   return { state: s, effects: fx };
 }
