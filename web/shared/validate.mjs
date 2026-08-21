@@ -8,6 +8,24 @@ const MODES = ['weekly', 'warmup', 'casual'];
 const NOTE = { min: 3, max: 1000 };
 const PRAHA = { lat: [49.8, 50.3], lng: [14.0, 14.8] }; // hrubý rám, jen ať do DB nelezou nesmysly
 
+// segments = úsečky jednoho kola, jedna na každou linku stanice: [[[lat,lng],[lat,lng]], ...]
+// round: {station, u, v}; allowPartial = propadlé kolo, hráč nemusel stihnout všechny úsečky
+export function validateRound(segments, round, { allowPartial = false } = {}) {
+  const expected = round.station.lines.length;
+  if (!Array.isArray(segments)) return { ok: false, error: 'segments' };
+  if (allowPartial ? segments.length > expected : segments.length !== expected) return { ok: false, error: 'segments' };
+  const vp = roundViewport(round);
+  for (const seg of segments) {
+    if (!Array.isArray(seg) || seg.length !== 2) return { ok: false, error: 'points' };
+    for (const p of seg) {
+      if (!Array.isArray(p) || p.length !== 2 || !p.every(Number.isFinite)) return { ok: false, error: 'points' };
+      const [x, y] = toLocalMeters(p[0], p[1], vp);
+      if (Math.abs(x) > VIEW_SIZE / 2 + MARGIN || Math.abs(y) > VIEW_SIZE / 2 + MARGIN) return { ok: false, error: 'bounds' };
+    }
+  }
+  return { ok: true };
+}
+
 // body: {week, nick, lines}; lines[i] = úsečky kola i, jedna na každou linku stanice:
 // [[[lat,lng],[lat,lng]], ...], nebo null = propadlé kolo (vypršel čas) → 0 bodů.
 // rounds: výstup weeklyChallenge; currentWeek: isoWeek(now)
@@ -19,17 +37,8 @@ export function validateSubmission(body, rounds, currentWeek) {
   for (let i = 0; i < rounds.length; i++) {
     const segments = body.lines[i];
     if (segments === null) continue; // propadlé kolo
-    const expected = rounds[i].station.lines.length;
-    if (!Array.isArray(segments) || segments.length !== expected) return { ok: false, error: `segments round ${i}` };
-    const vp = roundViewport(rounds[i]);
-    for (const seg of segments) {
-      if (!Array.isArray(seg) || seg.length !== 2) return { ok: false, error: `points round ${i}` };
-      for (const p of seg) {
-        if (!Array.isArray(p) || p.length !== 2 || !p.every(Number.isFinite)) return { ok: false, error: `points round ${i}` };
-        const [x, y] = toLocalMeters(p[0], p[1], vp);
-        if (Math.abs(x) > VIEW_SIZE / 2 + MARGIN || Math.abs(y) > VIEW_SIZE / 2 + MARGIN) return { ok: false, error: `bounds round ${i}` };
-      }
-    }
+    const r = validateRound(segments, rounds[i]);
+    if (!r.ok) return { ok: false, error: `${r.error} round ${i}` };
   }
   return { ok: true };
 }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateSubmission, validateReport } from '../web/shared/validate.mjs';
+import { validateRound, validateSubmission, validateReport } from '../web/shared/validate.mjs';
 import { weeklyChallenge, roundViewport } from '../web/shared/seed.mjs';
 
 const axis = (lat, line) => ({ line, pts: [[lat, 14.399], [lat, 14.401]] });
@@ -45,6 +45,35 @@ test('přestupní kolo vyžaduje dvě úsečky', () => {
   const r = validateSubmission({ week, nick: 'Hráč', lines: one }, rounds, week);
   assert.equal(r.ok, false);
   assert.match(r.error, /segments/);
+});
+
+// jednotlivé kolo mimo týdenní výzvu — casual a rozehřátí posílají guess po každém kole
+const transfer = fx.find(s => s.lines.length === 2);
+const soloRound = { station: fx[0], u: 0.3, v: 0.7 };
+const transferRound = { station: transfer, u: 0.5, v: 0.5 };
+const segNear = (round, k = 0) => {
+  const vp = roundViewport(round);
+  return [[vp.lat - 0.0005, vp.lng + k * 0.0002], [vp.lat + 0.0005, vp.lng + k * 0.0002]];
+};
+
+test('validateRound: kolo mimo týdenní výzvu projde', () => {
+  assert.equal(validateRound([segNear(soloRound)], soloRound).ok, true);
+  assert.equal(validateRound([segNear(transferRound, 0), segNear(transferRound, 1)], transferRound).ok, true);
+});
+
+test('validateRound: bod mimo výřez neprojde', () => {
+  const r = validateRound([[[50.5, 14.4], segNear(soloRound)[1]]], soloRound);
+  assert.equal(r.ok, false);
+  assert.equal(r.error, 'bounds');
+});
+
+test('validateRound: chybějící úsečku pustí jen allowPartial', () => {
+  const one = [segNear(transferRound)];
+  assert.equal(validateRound(one, transferRound).error, 'segments');
+  assert.equal(validateRound(one, transferRound, { allowPartial: true }).ok, true);
+  assert.equal(validateRound([], transferRound, { allowPartial: true }).ok, true);
+  // ani propadlé kolo nesmí poslat víc úseček, než kolik má stanice linek
+  assert.equal(validateRound([one[0], one[0], one[0]], transferRound, { allowPartial: true }).error, 'segments');
 });
 
 test('špatný nick / týden / počet kol / počet bodů / bod mimo výřez → chyba', () => {

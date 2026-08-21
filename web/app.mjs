@@ -11,6 +11,10 @@ const week = isoWeek(new Date());
 const playedKey = `pmg-played-${week}`;
 const hintKey = 'pmg-hint-seen';
 
+// pseudonymní ID pro statistiky — nic osobního, hráč ho smaže vyčištěním localStorage
+let session = localStorage.getItem('pmg-session');
+if (!session) localStorage.setItem('pmg-session', (session = crypto.randomUUID()));
+
 const SECONDS = { single: 20, transfer: 30 }; // přestup chce dvě úsečky, dostane víc času
 const ROUNDS = 10;
 
@@ -175,8 +179,26 @@ function setScore(to) {
   requestAnimationFrame(tick);
 }
 
+// ---------- sběr dat ----------
+// jeden řádek v DB na každé odehrané kolo; skóre si server přepočítá sám z úseček
+let roundStartedAt = 0;
+const elapsedMs = () => Math.min(600000, Math.max(0, Math.round(performance.now() - roundStartedAt)));
+
+function logGuess({ station, segments, timedOut, forfeited }) {
+  const { u, v } = rounds[roundIdx];
+  fetch('/api/guess', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      session, mode, stationId: station.id, roundIdx, u, v,
+      segments, ms: elapsedMs(), timedOut, forfeited,
+    }),
+  }).catch(() => {}); // výpadek sítě nesmí sáhnout na průběh hry
+}
+
 // ---------- kola ----------
 function startRound() {
+  roundStartedAt = performance.now();
   segs = []; anchor = cursor = null;
   redraw();
   renderTiles(tilesEl, vp(), sizePx());
@@ -206,6 +228,7 @@ function finishRound(timedOut) {
 
   const segments = segs.map(seg => seg.map(([x, y]) => pxToLatLng(x, y, vp(), s)));
   const { d, score, perLine } = scoreRound(segments, station);
+  logGuess({ station, segments, timedOut, forfeited: false });
   if (mode === 'weekly') { lines.push(segments); }
   if (mode !== 'casual') { totalScore += score; setScore(totalScore); }
   hideHint();
@@ -223,6 +246,13 @@ function finishRound(timedOut) {
 
 // vypršel čas a chybí úsečka → 0 bodů, ale osu ukaž (hráč se má co naučit)
 function forfeitRound(station, s) {
+  // i rozkreslené úsečky jsou data — hráč začal a nestihl
+  logGuess({
+    station,
+    segments: segs.map(seg => seg.map(([x, y]) => pxToLatLng(x, y, vp(), s))),
+    timedOut: true,
+    forfeited: true,
+  });
   if (mode === 'weekly') lines.push(null);
   hideHint();
   segs = []; anchor = cursor = null;
