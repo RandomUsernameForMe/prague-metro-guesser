@@ -115,7 +115,16 @@ function mergeAxes(axes, station) {
     .sort((a, b) => a.k - b.k);
   const mid = ((kept[0].k + kept.at(-1).k + 1) / 2) * BIN;
   const near = kept.filter(b => Math.abs((b.k + 0.5) * BIN - mid) <= HALF);
-  const pts = (near.length >= 2 ? near : kept).map(b => f.back((b.k + 0.5) * BIN, b.o));
+  const band = near.length >= 2 ? near : kept;
+  // hráč kreslí úsečku, takže i osa je úsečka: středy pruhů proloží přímka (least squares),
+  // jinak osa kopíruje oblouk koleje a v mapě je vidět zakřivená
+  const A = band.map(b => (b.k + 0.5) * BIN);
+  const ma = A.reduce((s, a) => s + a, 0) / A.length;
+  const mo = band.reduce((s, b) => s + b.o, 0) / band.length;
+  const den = A.reduce((s, a) => s + (a - ma) ** 2, 0);
+  const slope = den ? band.reduce((s, b, i) => s + (A[i] - ma) * (b.o - mo), 0) / den : 0;
+  const at = a => f.back(a, mo + slope * (a - ma));
+  const pts = [at(Math.min(...A)), at(Math.max(...A))];
   return pts.map(([x, y]) => [
     station.lat + y / M_PER_DEG_LAT,
     station.lng + x / mPerDegLng(station.lat),
@@ -142,10 +151,10 @@ for (const s of stations) {
   // právě jedna osa na linku — hráč za linku kreslí jedinou úsečku
   assert.equal(s.axes.length, s.lines.length, `${s.name}: os=${s.axes.length}, linek=${s.lines.length}`);
   for (const a of s.axes) {
-    assert.ok(a.pts.length >= 2, `${s.name}/${a.line}: osa má ${a.pts.length} bodů`);
+    assert.equal(a.pts.length, 2, `${s.name}/${a.line}: osa má ${a.pts.length} bodů`);
     const m = a.pts.map(([lat, lng]) => toLocalMeters(lat, lng, s));
     const len = polyLen(m);
-    // rezerva nad 2×HALF: HALF se měří v projekci, oblouk je delší než tětiva
+    // rezerva nad 2×HALF: délka je v projekci na hlavní směr, sklon úsečku prodlouží
     assert.ok(len >= 60 && len <= 2 * HALF + 60, `${s.name}/${a.line}: osa ${len.toFixed(0)} m`);
   }
 }
