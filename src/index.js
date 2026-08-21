@@ -6,6 +6,9 @@ import * as stats from './api/stats.js';
 import * as exportCsv from './api/export.js';
 import * as adminReports from './admin/reports.js';
 
+export { MatchDO } from './match-do.js';
+export { LobbyDO } from './lobby-do.js';
+
 // cesta → metoda → handler; podpis zůstal z Pages Functions: ({ request, env })
 const ROUTES = {
   '/api/score': { POST: score.onRequestPost },
@@ -17,10 +20,22 @@ const ROUTES = {
   '/admin/reports': { GET: adminReports.onRequestGet },
 };
 
+const MATCH_PATH = /^\/api\/duel\/([ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6})$/;
+
 export default {
   async fetch(request, env) {
-    const { pathname } = new URL(request.url);
-    const handler = ROUTES[pathname]?.[request.method];
+    const url = new URL(request.url);
+
+    if (url.pathname === '/api/duel/queue' && request.method === 'POST') {
+      return env.LOBBY.get(env.LOBBY.idFromName('global')).fetch(request);
+    }
+    const match = url.pathname.match(MATCH_PATH);
+    if (match) {
+      // kód zápasu je zároveň jméno objektu — žádná mapovací tabulka
+      return env.MATCH.get(env.MATCH.idFromName(match[1])).fetch(request);
+    }
+
+    const handler = ROUTES[url.pathname]?.[request.method];
     // statické soubory řeší [assets] dřív, než se sem request dostane
     if (!handler) return new Response('not found', { status: 404 });
     return handler({ request, env });
