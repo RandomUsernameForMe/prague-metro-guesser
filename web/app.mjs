@@ -51,6 +51,11 @@ $('home').onclick = () => showIntro();
 function updateTask() {
   // v duelu si popisek kola řídí duel.mjs ze zpráv serveru
   if (!rounds.length || document.body.dataset.phase === 'duel') return;
+  if (reportDraw) {
+    $('round-label').textContent =
+      `oprava · nakresli, kudy osa vede doopravdy (${board.count()}/${required()}) · čas neběží`;
+    return;
+  }
   const st = rounds[roundIdx].station;
   const where = mode === 'casual' ? 'casual mode'
     : `${mode === 'warmup' ? 'rozehřátí' : 'kolo'} ${roundIdx + 1} z ${rounds.length}`;
@@ -118,6 +123,8 @@ function logGuess({ station, segments, timedOut, forfeited }) {
 // ---------- kola ----------
 function startRound() {
   roundStartedAt = performance.now();
+  reportDraw = null;              // hlášení nikdy nepřežije do dalšího kola
+  $('confirm').textContent = 'Potvrdit';
   board.setRound(vp(), required());
   paintPanel();
   overlay.hidden = true;
@@ -130,7 +137,7 @@ function startRound() {
   if (timed()) board.timerStart(roundSeconds() * 1000, () => finishRound(true));
 }
 
-$('confirm').onclick = () => finishRound(false);
+$('confirm').onclick = () => (reportDraw ? finishReportDraw() : finishRound(false));
 
 // timedOut: vypršel čas — co je nakresleno se počítá, neúplné kolo propadá za 0
 function finishRound(timedOut) {
@@ -182,38 +189,73 @@ function renderResult(station, big, detail, segments) {
     card.querySelector('h2').textContent = station.name;
     $('next').onclick = advance;
     if (mode === 'casual') $('back').onclick = () => showIntro();
-    $('report').onclick = () => showReportCard(station, big, detail, segments);
+    $('report').onclick = () => showReportCard({ station, big, detail, segments });
   });
 }
 
 // ---------- hlášení chybné stanice ----------
-function showReportCard(station, big, detail, segments) {
+// Slovní popis polohy je k ničemu — hráč osu rovnou zakreslí do mapy, bez odpočtu.
+// ctx = {station, big, detail, segments, note, fix}: co je potřeba k návratu na výsledek i k odeslání.
+function showReportCard(ctx) {
+  const { station, fix } = ctx;
   showCard(`
     <p class="label">nahlásit chybu</p>
     <h2></h2>
-    <p>Napiš, jak to má být správně — jméno stanice, linka, kudy vede nástupiště.</p>
-    <textarea id="note" maxlength="1000" rows="4" placeholder="Jak je to správně?"></textarea>
+    <p>${fix
+      ? 'Osu máš zakreslenou. Přidej komentář, jestli je co dodat, a odešli.'
+      : 'Zakresli do mapy, kudy osa nástupiště vede doopravdy. Čas při tom neběží.'}</p>
+    <button class="btn ${fix ? 'btn-ghost' : 'btn-primary'}" id="draw-fix">
+      ${fix ? 'Překreslit osu' : 'Zakreslit správnou osu'}
+    </button>
+    <textarea id="note" maxlength="1000" rows="3" placeholder="Komentář (nepovinný)"></textarea>
     <p class="error" id="report-err"></p>
-    <button class="btn btn-primary" id="send">Odeslat</button>
+    <button class="btn ${fix ? 'btn-primary' : 'btn-ghost'}" id="send">Odeslat</button>
     <button class="link-btn" id="cancel">zrušit</button>
   `, card => {
     card.querySelector('h2').textContent = station.name;
-    $('cancel').onclick = () => renderResult(station, big, detail, segments);
-    $('send').onclick = () => sendReport(station, segments);
-    $('note').focus();
+    $('note').value = ctx.note ?? '';
+    const withNote = () => ({ ...ctx, note: $('note').value });
+    $('draw-fix').onclick = () => startReportDraw(withNote());
+    $('cancel').onclick = () => renderResult(station, ctx.big, ctx.detail, ctx.segments);
+    $('send').onclick = () => sendReport(withNote());
   });
 }
 
-async function sendReport(station, segments) {
-  const note = $('note').value.trim();
-  if (note.length < 3) { $('report-err').textContent = 'Napiš aspoň pár slov.'; return; }
+// kreslení opravy: karta zmizí, hráč kreslí do stejného výřezu proti vyznačené (chybné) ose
+let reportDraw = null;
+
+function startReportDraw(ctx) {
+  reportDraw = ctx;
+  overlay.hidden = true;
+  board.clear();
+  board.keepAxes(ctx.station.axes);
+  $('clear').disabled = false;
+  $('confirm').textContent = 'Uložit osu';
+  updateTask();
+}
+
+function finishReportDraw() {
+  const ctx = reportDraw;
+  const fix = board.segments();
+  reportDraw = null;
+  $('confirm').textContent = 'Potvrdit';
+  showReportCard({ ...ctx, fix });
+}
+
+async function sendReport(ctx) {
+  const { station, fix } = ctx;
+  const note = ctx.note.trim();
+  if (!fix && note.length < 3) {
+    $('report-err').textContent = 'Zakresli správnou osu, nebo aspoň napiš, co je špatně.';
+    return;
+  }
   $('send').disabled = true;
   $('report-err').textContent = '';
   try {
     const res = await fetch('/api/report', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ stationId: station.id, note, mode, week, segments }),
+      body: JSON.stringify({ stationId: station.id, note, mode, week, segments: ctx.segments, fix }),
     });
     if (!res.ok) throw new Error((await res.json()).error);
   } catch (e) {
@@ -453,6 +495,7 @@ function showIntro(tab = introTab) {
   const switching = tab !== introTab; // přepnutí tabu nemá kartu znovu rozanimovat
   introTab = tab;
   const played = localStorage.getItem(playedKey);
+  reportDraw = null;
   board.timerStop();
   document.body.dataset.phase = 'intro';
   document.body.dataset.mode = tab;

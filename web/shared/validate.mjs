@@ -50,21 +50,33 @@ export function validateReport(body, stations) {
   const station = stations.find(s => s.id === body.stationId);
   if (!station) return { ok: false, error: 'station' };
   const note = typeof body.note === 'string' ? body.note.trim() : '';
-  if (note.length < NOTE.min || note.length > NOTE.max) return { ok: false, error: 'note' };
+  if (note.length > NOTE.max) return { ok: false, error: 'note' };
   if (!MODES.includes(body.mode)) return { ok: false, error: 'mode' };
   if (!WEEK_RE.test(body.week)) return { ok: false, error: 'week' };
 
   const segments = body.segments ?? null;
-  if (segments !== null) {
-    if (!Array.isArray(segments) || !segments.length || segments.length > 3) return { ok: false, error: 'segments' };
-    for (const seg of segments) {
-      if (!Array.isArray(seg) || seg.length !== 2) return { ok: false, error: 'segments' };
-      for (const p of seg) {
-        if (!Array.isArray(p) || p.length !== 2 || !p.every(Number.isFinite)) return { ok: false, error: 'segments' };
-        if (p[0] < PRAHA.lat[0] || p[0] > PRAHA.lat[1]) return { ok: false, error: 'segments' };
-        if (p[1] < PRAHA.lng[0] || p[1] > PRAHA.lng[1]) return { ok: false, error: 'segments' };
-      }
+  if (segments !== null && !praguePolyline(segments, 1, 3)) return { ok: false, error: 'segments' };
+
+  // fix = osa, jak ji hráč zakreslil; jedna úsečka na každou linku stanice
+  const n = station.lines.length;
+  const fix = body.fix ?? null;
+  if (fix !== null && !praguePolyline(fix, n, n)) return { ok: false, error: 'fix' };
+  // hlášení bez zakreslené osy musí aspoň něco říct slovy
+  if (!fix && note.length < NOTE.min) return { ok: false, error: 'note' };
+
+  return { ok: true, station, note, segments, fix };
+}
+
+// úsečky [[[lat,lng],[lat,lng]], ...] v hrubém rámu Prahy, min–max kusů
+function praguePolyline(segments, min, max) {
+  if (!Array.isArray(segments) || segments.length < min || segments.length > max) return false;
+  for (const seg of segments) {
+    if (!Array.isArray(seg) || seg.length !== 2) return false;
+    for (const p of seg) {
+      if (!Array.isArray(p) || p.length !== 2 || !p.every(Number.isFinite)) return false;
+      if (p[0] < PRAHA.lat[0] || p[0] > PRAHA.lat[1]) return false;
+      if (p[1] < PRAHA.lng[0] || p[1] > PRAHA.lng[1]) return false;
     }
   }
-  return { ok: true, station, note, segments };
+  return true;
 }

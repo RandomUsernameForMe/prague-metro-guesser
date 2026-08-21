@@ -1,5 +1,6 @@
 // Čistý stavový automat duelu. Nezná DOM, Cloudflare ani stanice — dostává
 // jen délky kol a už spočítané skóre, takže se testuje obyčejným node --test.
+export const READY_MS = 60000;   // kdo do minuty nepotvrdí, od hry odešel
 export const COUNTDOWN_MS = 3000;
 export const REVEAL_MS = 3000;
 export const SHOT_CLOCK_MS = 5000;
@@ -13,10 +14,10 @@ export function initialState(code, roundMs) {
   return {
     code,
     roundMs,
-    phase: 'waiting',      // waiting | countdown | drawing | reveal | paused | ended
+    phase: 'waiting',      // waiting | ready | countdown | drawing | reveal | paused | ended
     roundIndex: 0,
     deadline: 0,           // absolutní čas v ms; 0 = nic neběží
-    players: {},           // id → {nick, connected, total, submitted, score}
+    players: {},           // id → {nick, connected, ready, total, submitted, score}
     order: [],             // pořadí připojení, ['a', 'b']
     pausedPhase: null,
     pausedRemainingMs: 0,
@@ -39,6 +40,7 @@ export const stateMsg = s => ({
     id,
     nick: s.players[id].nick,
     connected: s.players[id].connected,
+    ready: s.players[id].ready,
     total: s.players[id].total,
     submitted: s.players[id].submitted,
   })),
@@ -49,6 +51,7 @@ export function reduce(state, event, now) {
   const fx = [];
   switch (event.type) {
     case 'join': return join(s, event, now, fx);
+    case 'ready': return markReady(s, event, now, fx);
     case 'timeout': return timeout(s, now, fx);
     case 'submit': return submit(s, event, now, fx);
     case 'disconnect': return disconnect(s, event, now, fx);
@@ -63,12 +66,26 @@ function join(s, { playerId, nick }, now, fx) {
     fx.push(send(playerId, { type: 'error', error: 'full' }));
     return { state: s, effects: fx };
   }
-  s.players[playerId] = { nick, connected: true, total: 0, submitted: false, score: 0 };
+  s.players[playerId] = { nick, connected: true, ready: false, total: 0, submitted: false, score: 0 };
   s.order.push(playerId);
+  // zápas nespouštíme příchodem druhého — nejdřív musí oba potvrdit, že sedí u počítače
   if (s.order.length === 2) {
+    s.phase = 'ready';
+    s.deadline = now + READY_MS;
+    fx.push(alarm(s.deadline));
+  }
+  fx.push(send('all', stateMsg(s)));
+  return { state: s, effects: fx };
+}
+
+function markReady(s, { playerId }, now, fx) {
+  const p = s.players[playerId];
+  if (s.phase !== 'ready' || !p || p.ready) return { state: s, effects: fx };
+  p.ready = true;
+  if (s.order.every(id => s.players[id].ready)) {
     s.phase = 'countdown';
     s.deadline = now + COUNTDOWN_MS;
-    fx.push(alarm(s.deadline));
+    fx.push(alarm(s.deadline));   // přepíše alarm ready checku
   }
   fx.push(send('all', stateMsg(s)));
   return { state: s, effects: fx };
@@ -76,6 +93,7 @@ function join(s, { playerId, nick }, now, fx) {
 
 function timeout(s, now, fx) {
   switch (s.phase) {
+    case 'ready': return end(s, 'noshow', fx);
     case 'countdown': return startRound(s, 0, now, fx);
     case 'drawing': return endRound(s, now, fx);
     case 'reveal':
@@ -124,7 +142,11 @@ function end(s, reason, fx) {
   s.phase = 'ended';
   s.deadline = 0;
   s.reason = reason;
-  if (reason === 'forfeit') {
+  if (reason === 'noshow') {
+    // vyhraje ten, kdo potvrdil; když nepotvrdil nikdo, není co vyhrát
+    const waiting = s.order.filter(id => s.players[id].ready);
+    s.winner = waiting.length === 1 ? waiting[0] : null;
+  } else if (reason === 'forfeit') {
     s.winner = s.order.find(id => s.players[id].connected) ?? null;
   } else {
     const [a, b] = s.order;

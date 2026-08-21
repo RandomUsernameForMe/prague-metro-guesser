@@ -113,6 +113,34 @@ test('report bez úseček (propadlé kolo) projde', () => {
   assert.equal(r.segments, null);
 });
 
+// hráč zakreslí, kudy osa vede doopravdy — jedna úsečka na každou linku stanice
+const fixSeg = [[50.072, 14.4], [50.073, 14.4]];
+
+test('report se zakreslenou osou projde i bez komentáře', () => {
+  const r = validateReport({ ...goodReport, note: '', fix: [fixSeg] }, fx);
+  assert.equal(r.ok, true);
+  assert.equal(r.note, '');
+  assert.deepEqual(r.fix, [fixSeg]);
+});
+
+test('přestupní stanice chce osu pro každou linku', () => {
+  const twoLines = { ...goodReport, stationId: 'Můstek', note: '', segments: null };
+  assert.equal(validateReport({ ...twoLines, fix: [fixSeg] }, fx).error, 'fix');
+  assert.equal(validateReport({ ...twoLines, fix: [fixSeg, fixSeg] }, fx).ok, true);
+});
+
+test('hlášení bez osy i bez komentáře neprojde', () => {
+  const r = validateReport({ ...goodReport, note: '', fix: null }, fx);
+  assert.equal(r.ok, false);
+  assert.match(r.error, /note/);
+});
+
+test('osa mimo Prahu → chyba', () => {
+  const r = validateReport({ ...goodReport, note: '', fix: [[[0, 0], [50.07, 14.4]]] }, fx);
+  assert.equal(r.ok, false);
+  assert.match(r.error, /fix/);
+});
+
 test('neznámá stanice / prázdná poznámka / cizí režim / bod mimo Prahu → chyba', () => {
   const bad = [
     [{ ...goodReport, stationId: 'nope' }, /station/],
