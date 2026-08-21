@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isoWeek, weeklyChallenge, roundViewport, VIEW_SIZE } from '../web/shared/seed.mjs';
+import { isoWeek, weeklyChallenge, practiceRounds, roundViewport, VIEW_SIZE } from '../web/shared/seed.mjs';
 
 // fixture: 14 stanic, 3 přestupní
 const fx = [];
@@ -35,6 +35,24 @@ test('weeklyChallenge: vždy ≥1 přestupní, u/v v [0.15,0.85]', () => {
       assert.ok(r.u >= 0.15 && r.u <= 0.85 && r.v >= 0.15 && r.v <= 0.85);
     }
   }
+});
+
+test('practiceRounds: nikdy nedá stanici z týdenní výzvy', () => {
+  const weekly = weeklyChallenge('2026-34', fx);
+  const excluded = new Set(weekly.map(r => r.station.id));
+  for (let i = 0; i < 50; i++) {
+    const rounds = practiceRounds(fx, 10, excluded);
+    for (const r of rounds) assert.ok(!excluded.has(r.station.id), `únik: ${r.station.name}`);
+    assert.equal(new Set(rounds.map(r => r.station.id)).size, rounds.length, 'duplicitní stanice');
+    for (const r of rounds) {
+      assert.ok(r.u >= 0.15 && r.u <= 0.85 && r.v >= 0.15 && r.v <= 0.85);
+    }
+  }
+});
+
+test('practiceRounds: nespadne, když je stanic míň než kol', () => {
+  const rounds = practiceRounds(fx.slice(0, 3), 10);
+  assert.equal(rounds.length, 3);
 });
 
 test('roundViewport: u=0.15 → střed 210 m východně od stanice', () => {

@@ -24,8 +24,9 @@ export async function onRequestPost({ request, env }) {
   ).bind(ipHash).first();
   if (cnt >= 10) return json({ error: 'rate limit' }, 429);
 
-  // skóre počítá server — číslo od klienta se ignoruje
-  const score = rounds.reduce((sum, r, i) => sum + scoreRound(body.lines[i], r.station).score, 0);
+  // skóre počítá server — číslo od klienta se ignoruje; null = propadlé kolo
+  const score = rounds.reduce(
+    (sum, r, i) => sum + (body.lines[i] === null ? 0 : scoreRound(body.lines[i], r.station).score), 0);
 
   try {
     await env.DB.prepare(

@@ -1,16 +1,22 @@
-import { isoWeek, weeklyChallenge, roundViewport } from './shared/seed.mjs';
+import { isoWeek, weeklyChallenge, practiceRounds, roundViewport } from './shared/seed.mjs';
 import { scoreRound } from './shared/scoring.mjs';
 import { renderTiles, prefetchTiles, pxToLatLng, latLngToPx } from './tiles.mjs';
 
 const $ = id => document.getElementById(id);
 const stage = $('stage'), tilesEl = $('tiles'), svg = $('draw'), overlay = $('overlay'), hintEl = $('hint');
+const timebar = $('timebar'), clockEl = $('clock');
 
 const stations = await (await fetch('stations.json')).json();
 const week = isoWeek(new Date());
 const playedKey = `pmg-played-${week}`;
 const hintKey = 'pmg-hint-seen';
 
-let mode = 'weekly'; // 'weekly' | 'training'
+const ROUND_SECONDS = 15;
+const ROUNDS = 10;
+
+// weekly: ostrá výzva se zápisem · warmup: 10 stanic mimo výzvu, na nečisto · casual: bez času a bez konce
+let mode = 'weekly';
+const timed = () => mode !== 'casual';
 let rounds = [], roundIdx = 0, totalScore = 0;
 // stanice metra je rovné nástupiště → hráč kreslí úsečky, jednu na každou linku stanice
 let segs = [];          // hotové úsečky v px stage: [[[x,y],[x,y]], ...]
@@ -84,12 +90,46 @@ function hideHint() {
   localStorage.setItem(hintKey, '1');
 }
 
+// ---------- odpočet ----------
+let timerRaf = null, deadline = 0;
+
+function stopTimer() {
+  if (timerRaf) cancelAnimationFrame(timerRaf);
+  timerRaf = null;
+  timebar.hidden = true;
+  clockEl.hidden = true;
+  timebar.classList.remove('urgent');
+  clockEl.classList.remove('urgent');
+}
+
+function startTimer() {
+  stopTimer();
+  if (!timed()) return;
+  deadline = performance.now() + ROUND_SECONDS * 1000;
+  timebar.hidden = false;
+  clockEl.hidden = false;
+  const bar = timebar.firstElementChild;
+  const tick = now => {
+    const left = Math.max(0, deadline - now);
+    bar.style.transform = `scaleX(${left / (ROUND_SECONDS * 1000)})`;
+    const secs = Math.ceil(left / 1000);
+    $('clock-value').textContent = secs;
+    const urgent = left <= 5000;
+    timebar.classList.toggle('urgent', urgent);
+    clockEl.classList.toggle('urgent', urgent);
+    if (left <= 0) { timerRaf = null; finishRound(true); return; }
+    timerRaf = requestAnimationFrame(tick);
+  };
+  timerRaf = requestAnimationFrame(tick);
+}
+
 // ---------- panel ----------
 // zadání kola + kolik úseček ještě chybí
 function updateTask() {
   if (!rounds.length) return;
   const st = rounds[roundIdx].station;
-  const where = mode === 'weekly' ? `kolo ${roundIdx + 1} z ${rounds.length}` : 'trénink';
+  const where = mode === 'casual' ? 'casual mode'
+    : `${mode === 'warmup' ? 'rozehřátí' : 'kolo'} ${roundIdx + 1} z ${rounds.length}`;
   const task = st.lines.length > 1
     ? `přestup ${st.lines.join('+')} · nakresli ${st.lines.length} úsečky (${segs.length}/${st.lines.length})`
     : 'nakresli osu nástupiště jednou úsečkou';
@@ -108,7 +148,7 @@ function paintPanel() {
     return b;
   }));
   updateTask();
-  $('progress').replaceChildren(...(mode === 'weekly'
+  $('progress').replaceChildren(...(mode !== 'casual'
     ? Array.from({ length: rounds.length }, (_, i) => {
       const li = document.createElement('li');
       if (i < roundIdx) li.className = 'done';
@@ -116,7 +156,7 @@ function paintPanel() {
       return li;
     })
     : []));
-  $('home').hidden = mode !== 'training';
+  $('home').hidden = mode === 'weekly';
 }
 
 // krátký dopočet skóre, ať číslo neskočí
@@ -141,22 +181,31 @@ function startRound() {
   paintPanel();
   overlay.hidden = true;
   $('clear').disabled = false;
-  document.body.dataset.phase = mode; // 'weekly' | 'training' — v tréninku se skóre nesbírá
+  document.body.dataset.phase = mode;
   if (!localStorage.getItem(hintKey)) {
     hintEl.textContent = 'Táhni přes snímek (nebo klikni dvakrát) — nakresli přímou osu nástupiště.';
     hintEl.hidden = false;
   }
   // snímek dalšího kola natáhni dopředu, ať je přepnutí okamžité
-  const next = mode === 'weekly' ? rounds[roundIdx + 1] : null;
+  const next = rounds[roundIdx + 1];
   if (next) prefetchTiles(roundViewport(next), sizePx());
+  startTimer();
 }
 
-$('confirm').onclick = () => {
+$('confirm').onclick = () => finishRound(false);
+
+// timedOut: vypršel čas — co je nakresleno se počítá, neúplné kolo propadá za 0
+function finishRound(timedOut) {
+  stopTimer();
   const s = sizePx();
   const station = rounds[roundIdx].station;
+  const forfeited = segs.length < required();
+  if (timedOut && forfeited) return forfeitRound(station, s);
+
   const segments = segs.map(seg => seg.map(([x, y]) => pxToLatLng(x, y, vp(), s)));
   const { d, score, perLine } = scoreRound(segments, station);
-  if (mode === 'weekly') { lines.push(segments); totalScore += score; setScore(totalScore); }
+  if (mode === 'weekly') { lines.push(segments); }
+  if (mode !== 'casual') { totalScore += score; setScore(totalScore); }
   hideHint();
   // reveal skutečných os, každá v barvě své linky (souřadnice = čísla z vlastních dat)
   const axesSvg = station.axes.map(axis => {
@@ -167,27 +216,72 @@ $('confirm').onclick = () => {
   const detail = perLine.length > 1
     ? perLine.map(r => `linka ${r.line}: ${Math.round(r.d)} m`).join(' · ')
     : `odchylka ${Math.round(d)} m od skutečné osy`;
+  showResultCard(station, `+${score}`, timedOut ? `čas vypršel · ${detail}` : detail);
+}
+
+// vypršel čas a chybí úsečka → 0 bodů, ale osu ukaž (hráč se má co naučit)
+function forfeitRound(station, s) {
+  if (mode === 'weekly') lines.push(null);
+  hideHint();
+  segs = []; anchor = cursor = null;
+  const axesSvg = station.axes.map(axis => {
+    const pts = axis.pts.map(([lat, lng]) => latLngToPx(lat, lng, vp(), s).join(',')).join(' ');
+    return `<polyline points="${pts}" fill="none" stroke="var(--${axis.line.toLowerCase()})" stroke-width="5" stroke-linecap="round" stroke-dasharray="1000" stroke-dashoffset="1000" style="animation: reveal 1s forwards"/>`;
+  }).join('');
+  redraw(axesSvg + `<style>@keyframes reveal { to { stroke-dashoffset: 0; } }</style>`);
+  showResultCard(station, '0', required() > 1
+    ? 'Čas vypršel — u přestupní stanice musíš stihnout obě úsečky.'
+    : 'Čas vypršel — nestihl jsi nakreslit úsečku.');
+}
+
+function showResultCard(station, big, detail) {
+  const where = mode === 'weekly' ? `kolo ${roundIdx + 1} z ${rounds.length}`
+    : mode === 'warmup' ? `rozehřátí ${roundIdx + 1} z ${rounds.length}` : 'casual';
   setTimeout(() => showCard(`
-    <p class="label">${mode === 'weekly' ? `kolo ${roundIdx + 1} z ${rounds.length}` : 'trénink'}</p>
+    <p class="label">${where}</p>
     <h2></h2>
-    <div class="big">+${score}</div>
+    <div class="big">${big}</div>
     <p>${detail}</p>
     <button class="btn btn-primary" id="next">${nextLabel()}</button>
-    ${mode === 'training' ? '<button class="link-btn" id="back">← zpět na začátek</button>' : ''}
+    ${mode === 'casual' ? '<button class="link-btn" id="back">← zpět na začátek</button>' : ''}
   `, card => {
     card.querySelector('h2').textContent = station.name;
     $('next').onclick = advance;
-    if (mode === 'training') $('back').onclick = () => showIntro();
+    if (mode === 'casual') $('back').onclick = () => showIntro();
   }), 1200);
-};
+}
 
 const nextLabel = () =>
-  mode === 'training' ? 'Další stanice' : roundIdx + 1 < rounds.length ? 'Další kolo' : 'Vyhodnocení';
+  mode === 'casual' ? 'Další stanice'
+    : roundIdx + 1 < rounds.length ? 'Další kolo'
+      : mode === 'warmup' ? 'Vyhodnocení rozehřátí' : 'Vyhodnocení';
 
 function advance() {
-  if (mode === 'training') { rounds = [randomRound()]; roundIdx = 0; startRound(); return; }
+  if (mode === 'casual') { rounds = [randomRound()]; roundIdx = 0; startRound(); return; }
   roundIdx++;
-  roundIdx < rounds.length ? startRound() : finish();
+  roundIdx < rounds.length ? startRound() : (mode === 'warmup' ? finishWarmup() : finish());
+}
+
+// ---------- konec rozehřátí ----------
+function finishWarmup() {
+  const played = localStorage.getItem(playedKey);
+  const max = rounds.length * 1000;
+  showCard(`
+    <p class="label">rozehřátí · na nečisto</p>
+    <h2>${totalScore.toLocaleString('cs')} z ${max.toLocaleString('cs')}</h2>
+    <p>Tyhle stanice v týdenní výzvě nebudou — teď víš, na čem jsi.</p>
+    ${played
+      ? `<button class="btn btn-primary" id="again">Rozehřát znovu</button>
+         <button class="btn btn-ghost" id="lb">Žebříček</button>`
+      : `<button class="btn btn-primary" id="play">Hrát týdenní výzvu na ostro</button>
+         <button class="btn btn-ghost" id="again">Ještě jednou na nečisto</button>`}
+    <button class="link-btn" id="back">← zpět na začátek</button>
+  `, () => {
+    if (played) $('lb').onclick = () => showLeaderboard(played);
+    else $('play').onclick = startWeekly;
+    $('again').onclick = startWarmup;
+    $('back').onclick = () => showIntro();
+  });
 }
 
 // ---------- konec + odeslání ----------
@@ -238,10 +332,10 @@ async function showLeaderboard(me) {
     <p class="label">žebříček</p>
     <h2>Týden ${week}</h2>
     <div id="lb-list"><p>Načítám…</p></div>
-    <button class="btn btn-ghost" id="train">Trénovat dál</button>
+    <button class="btn btn-ghost" id="train">Casual mode</button>
     <button class="link-btn" id="back">← zpět na začátek</button>
   `, () => {
-    $('train').onclick = startTraining;
+    $('train').onclick = startCasual;
     $('back').onclick = () => showIntro();
   });
   const box = $('lb-list');
@@ -275,9 +369,19 @@ function randomRound() {
   return { station, u: 0.15 + Math.random() * 0.7, v: 0.15 + Math.random() * 0.7 };
 }
 
-function startTraining() {
-  mode = 'training';
+function startCasual() {
+  mode = 'casual';
   rounds = [randomRound()]; roundIdx = 0;
+  startRound();
+}
+
+// rozehřátí: 10 stanic, které v týdenní výzvě nepadnou
+function startWarmup() {
+  mode = 'warmup';
+  const weeklyIds = new Set(weeklyChallenge(week, stations).map(r => r.station.id));
+  rounds = practiceRounds(stations, ROUNDS, weeklyIds);
+  roundIdx = 0; totalScore = 0;
+  $('score-value').textContent = '0';
   startRound();
 }
 
@@ -285,7 +389,7 @@ function startWeekly() {
   mode = 'weekly';
   rounds = weeklyChallenge(week, stations);
   roundIdx = 0; totalScore = 0; lines = [];
-  setScore(0); $('score-value').textContent = '0';
+  $('score-value').textContent = '0';
   startRound();
 }
 
@@ -297,6 +401,7 @@ function showCard(staticHtml, wire) {
   overlay.replaceChildren(card);
   overlay.hidden = false;
   hintEl.hidden = true;
+  stopTimer(); // odpočet nikdy neběží pod otevřenou kartou
   // overlay kryje jen mapu — tlačítka v panelu se musí zamknout ručně
   $('confirm').disabled = true;
   $('clear').disabled = true;
@@ -306,6 +411,7 @@ function showCard(staticHtml, wire) {
 // ---------- úvod + tutoriál ----------
 function showIntro() {
   const played = localStorage.getItem(playedKey);
+  stopTimer();
   document.body.dataset.phase = 'intro';
   $('station-name').textContent = 'Kde vede metro?';
   $('line-badges').replaceChildren();
@@ -318,15 +424,16 @@ function showIntro() {
     <h2>Metro Guesser</h2>
     <ol class="steps">
       <li><b>1</b><div>Dostaneš letecký snímek 600 × 600 m a jméno stanice.<br><span>Stanice je někde uvnitř, ale pod zemí ji nevidíš.</span></div></li>
-      <li><b>2</b><div>Nakresli úsečku, kudy vede nástupiště.<br><span>Táhni prstem či myší, nebo klikni na začátek a konec. U přestupní stanice kreslíš úsečku pro každou linku.</span></div></li>
+      <li><b>2</b><div>Za ${ROUND_SECONDS} sekund nakresli úsečku, kudy vede nástupiště.<br><span>Táhni prstem či myší, nebo klikni na začátek a konec. U přestupní stanice kreslíš úsečku pro každou linku. Nestihneš to → 0 bodů.</span></div></li>
       <li><b>3</b><div>Potvrdíš a uvidíš skutečnou osu kolejí.<br><span>Čím blíž jsi trefil, tím víc bodů — max 1000 za kolo.</span></div></li>
     </ol>
     ${played
       ? `<p>Týdenní výzvu už jsi tenhle týden odehrál jako <strong id="played-nick"></strong>.</p>
-         <button class="btn btn-primary" id="lb">Žebříček</button>
-         <button class="btn btn-ghost" id="train">Trénink</button>`
-      : `<button class="btn btn-primary" id="play">Hrát týdenní výzvu</button>
-         <button class="btn btn-ghost" id="train">Trénink bez zápisu</button>`}
+         <button class="btn btn-primary" id="warmup">Rozehřátí (${ROUNDS} stanic na nečisto)</button>
+         <button class="btn btn-ghost" id="lb">Žebříček</button>`
+      : `<button class="btn btn-primary" id="warmup">Rozehřátí — ${ROUNDS} stanic na nečisto</button>
+         <button class="btn btn-ghost" id="play">Rovnou týdenní výzva na ostro</button>`}
+    <button class="link-btn" id="casual">casual mode — bez času, bez konce, bez zápisu</button>
   `, card => {
     if (played) {
       card.querySelector('#played-nick').textContent = played;
@@ -334,7 +441,8 @@ function showIntro() {
     } else {
       $('play').onclick = startWeekly;
     }
-    $('train').onclick = startTraining;
+    $('warmup').onclick = startWarmup;
+    $('casual').onclick = startCasual;
   });
 }
 

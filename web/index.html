@@ -14,6 +14,7 @@
     <main id="stage">
       <div id="tiles"></div>
       <svg id="draw"></svg>
+      <div id="timebar" hidden><span></span></div>
       <p id="hint" hidden></p>
       <div id="overlay" hidden></div>
       <footer id="attribution">ortofoto © ČÚZK · data © OpenStreetMap</footer>
@@ -33,9 +34,15 @@
 
       <ol id="progress" class="progress"></ol>
 
-      <div class="score">
-        <span class="label">skóre</span>
-        <strong id="score-value">0</strong>
+      <div class="stats">
+        <div class="score">
+          <span class="label">skóre</span>
+          <strong id="score-value">0</strong>
+        </div>
+        <div class="clock" id="clock" hidden>
+          <span class="label">čas</span>
+          <strong id="clock-value">15</strong>
+        </div>
       </div>
 
       <div id="controls">

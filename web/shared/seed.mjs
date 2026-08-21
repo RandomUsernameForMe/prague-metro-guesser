@@ -44,6 +44,20 @@ export function weeklyChallenge(week, stations) {
   return chosen.map(station => ({ station, u: 0.15 + rng() * 0.7, v: 0.15 + rng() * 0.7 }));
 }
 
+// náhodná kola mimo zadané stanice — rozehřátí nesmí prozradit týdenní výzvu
+export function practiceRounds(stations, count, excludeIds = new Set()) {
+  const pool = stations.filter(s => !excludeIds.has(s.id));
+  const picked = [];
+  while (picked.length < count && pool.length) {
+    picked.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  }
+  return picked.map(station => ({
+    station,
+    u: 0.15 + Math.random() * 0.7,
+    v: 0.15 + Math.random() * 0.7,
+  }));
+}
+
 // u = zlomek zleva, v = zlomek shora, kde ve výřezu leží stanice
 export function roundViewport(round) {
   const { station, u, v } = round;

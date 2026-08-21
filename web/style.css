@@ -158,19 +158,39 @@ body {
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
-.score { display: grid; gap: 2px; margin-top: auto; }
-.score strong {
+.stats { display: flex; gap: 28px; align-items: end; margin-top: auto; }
+.score, .clock { display: grid; gap: 2px; }
+.score strong, .clock strong {
   font: 400 42px/1 Anton, sans-serif;
   font-variant-numeric: tabular-nums;
 }
+.clock[hidden] { display: none; }
+.clock strong { transition: color 0.2s var(--ease); }
+.clock.urgent strong { color: var(--c); animation: pulse 1s steps(2, end) infinite; }
+@keyframes pulse { 50% { opacity: 0.35; } }
+
+/* odpočet nad snímkem — ubývá zleva doprava */
+#timebar {
+  position: absolute; top: 0; left: 0; right: 0; height: 5px; z-index: 6;
+  background: rgba(9, 11, 12, 0.55);
+}
+#timebar[hidden] { display: none; }
+#timebar span {
+  display: block; height: 100%; width: 100%;
+  background: var(--accent);
+  transform-origin: left;
+  transition: background 0.3s var(--ease);
+}
+#timebar.urgent span { background: var(--c); }
 
 #controls { display: grid; gap: 10px; }
 
-/* v úvodu nemá smysl ukazovat skóre ani ovládání kreslení, v tréninku skóre */
-body[data-phase='intro'] .score,
+/* v úvodu nemá smysl ukazovat skóre ani ovládání kreslení, v casual módu skóre */
+body[data-phase='intro'] .stats,
 body[data-phase='intro'] #controls,
-body[data-phase='training'] .score { display: none; }
-body[data-phase='training'] #controls { margin-top: auto; }
+body[data-phase='casual'] .score { display: none; }
+body[data-phase='casual'] .stats:empty,
+body[data-phase='casual'] #controls { margin-top: auto; }
 .btn {
   font: 600 14px/1 Archivo, sans-serif;
   letter-spacing: 0.12em; text-transform: uppercase;

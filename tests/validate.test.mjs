@@ -32,6 +32,12 @@ test('validní payload projde', () => {
   assert.equal(r.ok, true);
 });
 
+test('propadlé kolo (null) projde — vypršel čas', () => {
+  const withNull = goodLines.map((l, i) => (i === 2 ? null : l));
+  const r = validateSubmission({ week, nick: 'Hráč', lines: withNull }, rounds, week);
+  assert.equal(r.ok, true);
+});
+
 test('přestupní kolo vyžaduje dvě úsečky', () => {
   const i = rounds.findIndex(r => r.station.lines.length === 2);
   assert.ok(i >= 0, 've výzvě chybí přestupní stanice');
