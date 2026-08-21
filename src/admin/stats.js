@@ -1,5 +1,5 @@
 import stations from '../../web/stations.json';
-import { page, html, esc, int, fix1, pct, secs, den } from './_layout.js';
+import { page, html, esc, int, fix1, pct, secs, den } from './layout.js';
 
 const byId = new Map(stations.map(s => [s.id, s]));
 

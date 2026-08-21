@@ -1,7 +1,7 @@
-import { page, html, card, int, pct } from './_layout.js';
+import { page, html, card, int, pct } from './layout.js';
 
 // CSV je za tokenem, ne za admin heslem. Odkaz proto token doplní ze secretu —
-// vidí ho jen ten, kdo už prošel Basic Authem o kus výš v _middleware.js.
+// vidí ho jen ten, kdo už prošel Basic Authem v auth.js.
 function exportLink(env) {
   if (!env.EXPORT_TOKEN) return '<li><i>CSV export — nenastavený EXPORT_TOKEN</i></li>';
   const href = `/api/export?token=${encodeURIComponent(env.EXPORT_TOKEN)}`;

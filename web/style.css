@@ -184,7 +184,8 @@ body {
 /* v úvodu nemá smysl ukazovat skóre ani ovládání kreslení, v casual módu skóre */
 body[data-phase='intro'] .stats,
 body[data-phase='intro'] #controls,
-body[data-phase='casual'] .score { display: none; }
+body[data-phase='casual'] .score,
+body[data-phase='duel'] .score { display: none; } /* v duelu se skóre čte z pruhu se soupeřem */
 body[data-phase='casual'] .stats:empty,
 body[data-phase='casual'] #controls { margin-top: auto; }
 .btn {
@@ -314,3 +315,11 @@ body[data-phase='casual'] #controls { margin-top: auto; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+#duel { display: flex; gap: 12px; margin: 12px 0; }
+#duel .duel-side { flex: 1; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.06); }
+#duel .duel-side strong { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+.duel-flag { font-size: 12px; opacity: .75; }
+.duel-flag.waiting::before { content: 'kreslí…'; }
+.duel-flag.submitted::before { content: '✓ odevzdal'; }
+.duel-flag.gone::before { content: '⚠ odpojen'; }

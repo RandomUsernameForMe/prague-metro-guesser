@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { esc, int, fix1, pct, secs, den, page } from '../functions/admin/_layout.js';
+import { esc, int, fix1, pct, secs, den, page } from '../src/admin/layout.js';
 
 // note z hlášení je jediný neověřený uživatelský vstup, co teče do admin stránky
 test('esc: uživatelský vstup neuteče z HTML', () => {

@@ -1,6 +1,6 @@
-// Basic Auth pro celý /admin/*. Pages spouští _middleware.js před každou routou
-// v adresáři, takže heslo se ověřuje na jednom místě pro všechny admin stránky.
-// Heslo: `npx wrangler pages secret put ADMIN_PASSWORD` (lokálně řádek v .dev.vars)
+// Basic Auth pro celý /admin/*. Router volá guard() před každou admin routou,
+// takže heslo se ověřuje na jednom místě pro všechny admin stránky.
+// Heslo: `npx wrangler secret put ADMIN_PASSWORD` (lokálně řádek v .dev.vars)
 
 async function sha256(s) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
@@ -22,16 +22,15 @@ async function authorized(request, env) {
   return await sha256(given) === await sha256(expected);
 }
 
-export async function onRequest(context) {
-  if (!await authorized(context.request, context.env)) {
-    return new Response('401', {
-      status: 401,
-      headers: {
-        'www-authenticate': 'Basic realm="metro-guesser admin", charset="UTF-8"',
-        'cache-control': 'no-store',
-        'x-robots-tag': 'noindex',
-      },
-    });
-  }
-  return context.next();
+// vrátí 401, když heslo nesedí; jinak null a router pustí request dál
+export async function guard(request, env) {
+  if (await authorized(request, env)) return null;
+  return new Response('401', {
+    status: 401,
+    headers: {
+      'www-authenticate': 'Basic realm="metro-guesser admin", charset="UTF-8"',
+      'cache-control': 'no-store',
+      'x-robots-tag': 'noindex',
+    },
+  });
 }

@@ -5,7 +5,8 @@
   "scripts": {
     "test": "node --test 'tests/*.test.mjs'",
     "build:stations": "node scripts/build-stations.mjs",
-    "dev": "wrangler pages dev web"
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
   },
   "devDependencies": {
     "wrangler": "^4"
