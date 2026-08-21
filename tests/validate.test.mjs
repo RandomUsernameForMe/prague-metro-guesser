@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateSubmission } from '../web/shared/validate.mjs';
+import { validateSubmission, validateReport } from '../web/shared/validate.mjs';
 import { weeklyChallenge, roundViewport } from '../web/shared/seed.mjs';
 
 const axis = (lat, line) => ({ line, pts: [[lat, 14.399], [lat, 14.401]] });
@@ -58,6 +58,45 @@ test('špatný nick / týden / počet kol / počet bodů / bod mimo výřez → 
   ];
   for (const [payload, re] of bad) {
     const r = validateSubmission(payload, rounds, week);
+    assert.equal(r.ok, false, `mělo selhat: ${re}`);
+    assert.match(r.error, re);
+  }
+});
+
+// ---------- hlášení chybné stanice ----------
+const goodReport = {
+  stationId: 's0', note: '  Nástupiště vede sever–jih, ne východ–západ.  ',
+  mode: 'casual', week,
+  segments: [[[50.07, 14.4], [50.071, 14.4]]],
+};
+
+test('validní report projde a vrátí osekaná data', () => {
+  const r = validateReport(goodReport, fx);
+  assert.equal(r.ok, true);
+  assert.equal(r.station.id, 's0');
+  assert.equal(r.note, 'Nástupiště vede sever–jih, ne východ–západ.');
+  assert.equal(r.segments.length, 1);
+});
+
+test('report bez úseček (propadlé kolo) projde', () => {
+  const r = validateReport({ ...goodReport, segments: null }, fx);
+  assert.equal(r.ok, true);
+  assert.equal(r.segments, null);
+});
+
+test('neznámá stanice / prázdná poznámka / cizí režim / bod mimo Prahu → chyba', () => {
+  const bad = [
+    [{ ...goodReport, stationId: 'nope' }, /station/],
+    [{ ...goodReport, note: ' x ' }, /note/],
+    [{ ...goodReport, note: 'a'.repeat(1001) }, /note/],
+    [{ ...goodReport, mode: 'admin' }, /mode/],
+    [{ ...goodReport, week: 'letos' }, /week/],
+    [{ ...goodReport, segments: [[[0, 0], [50.07, 14.4]]] }, /segments/],
+    [{ ...goodReport, segments: [[[50.07, 14.4]]] }, /segments/],
+    [null, /body/],
+  ];
+  for (const [payload, re] of bad) {
+    const r = validateReport(payload, fx);
     assert.equal(r.ok, false, `mělo selhat: ${re}`);
     assert.match(r.error, re);
   }

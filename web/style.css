@@ -258,6 +258,13 @@ body[data-phase='casual'] #controls { margin-top: auto; }
   background: var(--concrete); color: var(--text); text-align: center;
 }
 .card input:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+.card textarea {
+  font: 500 15px/1.45 Archivo, sans-serif;
+  padding: 14px; border: 1px solid var(--hairline);
+  background: var(--concrete); color: var(--text);
+  resize: vertical;
+}
+.card textarea:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
 .card ol.board { list-style: none; padding: 0; display: grid; gap: 2px; text-align: left; }
 .card ol.board li {
   display: grid; grid-template-columns: 28px 1fr auto; gap: 10px;

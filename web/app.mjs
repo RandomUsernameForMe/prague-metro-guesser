@@ -218,7 +218,7 @@ function finishRound(timedOut) {
   const detail = perLine.length > 1
     ? perLine.map(r => `linka ${r.line}: ${Math.round(r.d)} m`).join(' · ')
     : `odchylka ${Math.round(d)} m od skutečné osy`;
-  showResultCard(station, `+${score}`, timedOut ? `čas vypršel · ${detail}` : detail);
+  showResultCard(station, `+${score}`, timedOut ? `čas vypršel · ${detail}` : detail, segments);
 }
 
 // vypršel čas a chybí úsečka → 0 bodů, ale osu ukaž (hráč se má co naučit)
@@ -233,24 +233,74 @@ function forfeitRound(station, s) {
   redraw(axesSvg + `<style>@keyframes reveal { to { stroke-dashoffset: 0; } }</style>`);
   showResultCard(station, '0', required() > 1
     ? 'Čas vypršel — u přestupní stanice musíš stihnout obě úsečky.'
-    : 'Čas vypršel — nestihl jsi nakreslit úsečku.');
+    : 'Čas vypršel — nestihl jsi nakreslit úsečku.', null);
 }
 
-function showResultCard(station, big, detail) {
+// reveal osy ještě chvíli běží — kartu ukaž až po něm
+const showResultCard = (...args) => setTimeout(() => renderResult(...args), 1200);
+
+function renderResult(station, big, detail, segments) {
   const where = mode === 'weekly' ? `kolo ${roundIdx + 1} z ${rounds.length}`
     : mode === 'warmup' ? `rozehřátí ${roundIdx + 1} z ${rounds.length}` : 'casual';
-  setTimeout(() => showCard(`
+  showCard(`
     <p class="label">${where}</p>
     <h2></h2>
     <div class="big">${big}</div>
     <p>${detail}</p>
     <button class="btn btn-primary" id="next">${nextLabel()}</button>
     ${mode === 'casual' ? '<button class="link-btn" id="back">← zpět na začátek</button>' : ''}
+    <button class="link-btn" id="report">stanice je v aplikaci zadaná špatně</button>
   `, card => {
     card.querySelector('h2').textContent = station.name;
     $('next').onclick = advance;
     if (mode === 'casual') $('back').onclick = () => showIntro();
-  }), 1200);
+    $('report').onclick = () => showReportCard(station, big, detail, segments);
+  });
+}
+
+// ---------- hlášení chybné stanice ----------
+function showReportCard(station, big, detail, segments) {
+  showCard(`
+    <p class="label">nahlásit chybu</p>
+    <h2></h2>
+    <p>Napiš, jak to má být správně — jméno stanice, linka, kudy vede nástupiště.</p>
+    <textarea id="note" maxlength="1000" rows="4" placeholder="Jak je to správně?"></textarea>
+    <p class="error" id="report-err"></p>
+    <button class="btn btn-primary" id="send">Odeslat</button>
+    <button class="link-btn" id="cancel">zrušit</button>
+  `, card => {
+    card.querySelector('h2').textContent = station.name;
+    $('cancel').onclick = () => renderResult(station, big, detail, segments);
+    $('send').onclick = () => sendReport(station, segments);
+    $('note').focus();
+  });
+}
+
+async function sendReport(station, segments) {
+  const note = $('note').value.trim();
+  if (note.length < 3) { $('report-err').textContent = 'Napiš aspoň pár slov.'; return; }
+  $('send').disabled = true;
+  $('report-err').textContent = '';
+  try {
+    const res = await fetch('/api/report', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ stationId: station.id, note, mode, week, segments }),
+    });
+    if (!res.ok) throw new Error((await res.json()).error);
+  } catch (e) {
+    $('report-err').textContent = String(e.message) === 'rate limit'
+      ? 'Moc hlášení za sebou — zkus to za chvíli.'
+      : 'Odeslání selhalo — zkus znovu';
+    $('send').disabled = false;
+    return;
+  }
+  showCard(`
+    <p class="label">nahlásit chybu</p>
+    <h2>Díky!</h2>
+    <p>Hlášení jsme uložili — mrkneme se na to.</p>
+    <button class="btn btn-primary" id="next">${nextLabel()}</button>
+  `, () => { $('next').onclick = advance; });
 }
 
 const nextLabel = () =>
