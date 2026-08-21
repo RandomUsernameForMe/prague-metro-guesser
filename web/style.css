@@ -1,6 +1,7 @@
 /* Vizuál: pražské metro — brutalistický beton, hliníkový vaflový obklad, barvy linek A/B/C */
 :root {
   --panel-w: 360px;
+  --map-h: min(100dvh, calc(100vw - var(--panel-w))); /* mapa je čtverec, tohle je i její šířka */
   --concrete: #0f1113;
   --alu: #191d21;
   --alu-hi: #23282d;
@@ -62,15 +63,16 @@ body {
 /* ---------- layout ---------- */
 #app {
   display: grid;
-  grid-template-columns: min(100dvh, calc(100vw - var(--panel-w))) var(--panel-w);
+  grid-template-columns: var(--map-h) var(--panel-w);
   justify-content: center;
   height: 100dvh;
 }
 
 #stage {
+  grid-area: 1 / 1; /* explicitně, ať #attribution ve stejné buňce nerozhodí auto-placement */
   position: relative;
   aspect-ratio: 1;
-  height: min(100dvh, calc(100vw - var(--panel-w)));
+  height: var(--map-h);
   overflow: hidden;
   touch-action: none;
   background: #0a0c0d;
@@ -82,6 +84,7 @@ body {
 
 /* ---------- boční panel: matné sklo nad fotkou ---------- */
 #panel {
+  grid-area: 1 / 2;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -331,8 +334,13 @@ body[data-phase='casual'] #controls { margin-top: auto; }
 }
 #hint[hidden] { display: none; }
 
+/* Sedí ve stejné grid buňce jako mapa, u jejího spodního okraje.
+   z-index 11 = nad overlay, licence fotek musí být vidět. */
 #attribution {
-  position: absolute; left: 0; bottom: 0; z-index: 11; /* nad overlay — licence fotek musí být vidět */
+  grid-area: 1 / 1; align-self: start; justify-self: start; z-index: 11;
+  /* Na spodní hranu mapy, ne buňky. Transformem, ať odsazení nenafoukne výšku řádku. */
+  transform: translateY(calc(var(--map-h) - 100%));
+  max-width: 100%;
   font-size: 10px; letter-spacing: 0.04em; color: var(--muted);
   background: rgba(9, 11, 12, 0.6); padding: 4px 8px;
 }
@@ -341,9 +349,10 @@ body[data-phase='casual'] #controls { margin-top: auto; }
 /* ---------- mobil: panel pod mapu ---------- */
 @media (max-width: 900px), (orientation: portrait) {
   body { overflow: auto; }
-  #app { grid-template-columns: 1fr; grid-template-rows: auto auto; height: auto; min-height: 100dvh; }
+  #app { grid-template-columns: 1fr; grid-template-rows: auto auto auto; height: auto; min-height: 100dvh; }
   #stage { height: auto; width: 100vw; }
   #panel {
+    grid-area: 2 / 1;
     border-left: 0; border-top: 1px solid var(--hairline);
     padding: 20px 18px 28px; gap: 18px;
   }
@@ -353,6 +362,13 @@ body[data-phase='casual'] #controls { margin-top: auto; }
   #station-name { font-size: 30px; }
   #controls { grid-template-columns: 1fr 1fr; margin-top: 6px; }
   #overlay { position: fixed; }
+  /* atribuce patří na konec stránky, ne jako tmavá lišta doprostřed obrazovky pod mapu */
+  #attribution {
+    grid-area: 3 / 1; align-self: auto; justify-self: stretch;
+    transform: none;
+    background: none; padding: 0 18px 20px;
+    text-align: center; line-height: 1.7;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
