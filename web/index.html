@@ -4,10 +4,24 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Metro Guesser — kde vede pražské metro?</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;800&family=Anton&display=swap" rel="stylesheet">
+  <meta name="description" content="Poznáš z leteckého snímku, kudy pod ním vede nástupiště pražského metra? Týdenní výzva, duel 1v1 a casual režim bez odpočtu.">
+  <link rel="icon" href="favicon.svg">
+
+  <!-- dlaždice se tahají z ČÚZK hned na začátku kola; handshake ať je hotový dřív -->
+  <link rel="preconnect" href="https://ags.cuzk.gov.cz">
   <link rel="stylesheet" href="style.css">
+  <!-- fonty a data, na kterých stojí první vykreslení -->
+  <link rel="preload" href="fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/anton-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="modulepreload" href="app.mjs">
+  <link rel="preload" href="stations.json" as="fetch" crossorigin>
+
+  <!-- pozvánka na duel se posílá odkazem, ať má v Messengeru náhled -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Metro Guesser — kde vede pražské metro?">
+  <meta property="og:description" content="Dostaneš letecký snímek 600 × 600 m a jméno stanice. Nakresli, kudy pod ním vede nástupiště. Zahraj si duel 1v1.">
+  <meta property="og:image" content="https://prague-metro-guesser.guth-jarkovsky-tomas.workers.dev/bg/malostranska.webp">
+  <meta name="twitter:card" content="summary_large_image">
 </head>
 <body>
   <div id="bg" aria-hidden="true"></div>

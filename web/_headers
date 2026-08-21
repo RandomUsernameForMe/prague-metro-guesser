@@ -1,0 +1,19 @@
+# Hlavičky pro statické soubory. Odpovědi Workeru (/api/*, /admin/*) si svoje
+# hlavičky nastavují samy v kódu — sem nespadají.
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), camera=(), microphone=(), interest-cohort=()
+  # img-src: ortofoto ČÚZK a záložní ArcGIS. style-src potřebuje 'unsafe-inline'
+  # kvůli <style> s animací odhalení, kterou si board.mjs vkládá do SVG; inline
+  # skript v aplikaci není žádný. connect-src má vedle 'self' i wss: schválně —
+  # podle CSP3 sice 'self' na wss stejného původu sedí, ale starší Safari to
+  # neumělo a rozbitý duel na iPhonu je horší než tenhle ústupek.
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://ags.cuzk.gov.cz https://server.arcgisonline.com; font-src 'self'; connect-src 'self' wss:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'
+
+# fonty se nemění; kdyby ano, přejmenuj soubor, ať se cache obejde
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+/bg/*
+  Cache-Control: public, max-age=604800
