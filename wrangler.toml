@@ -9,6 +9,9 @@ directory = "./web"
 binding = "DB"
 database_name = "metro-guesser"
 database_id = "853881c9-743d-4803-88cb-71cf7cf98b72"
+# migrace schématu: `npm run migrate` (viz DEPLOY.md). Pozor, není to totéž co
+# [[migrations]] níž — ty jsou o třídách Durable Objectů, ne o tabulkách.
+migrations_dir = "migrations"
 
 [[durable_objects.bindings]]
 name = "MATCH"
