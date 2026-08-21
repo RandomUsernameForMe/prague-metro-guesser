@@ -204,12 +204,12 @@ function showReportCard(ctx) {
     <p>${fix
       ? 'Osu máš zakreslenou. Přidej komentář, jestli je co dodat, a odešli.'
       : 'Zakresli do mapy, kudy osa nástupiště vede doopravdy. Čas při tom neběží.'}</p>
-    <button class="btn ${fix ? 'btn-ghost' : 'btn-primary'}" id="draw-fix">
+    <button class="btn ${fix ? 'btn-outline' : 'btn-primary'}" id="draw-fix">
       ${fix ? 'Překreslit osu' : 'Zakreslit správnou osu'}
     </button>
     <textarea id="note" maxlength="1000" rows="3" placeholder="Komentář (nepovinný)"></textarea>
     <p class="error" id="report-err"></p>
-    <button class="btn ${fix ? 'btn-primary' : 'btn-ghost'}" id="send">Odeslat</button>
+    <button class="btn ${fix ? 'btn-primary' : 'btn-outline'}" id="send">Odeslat</button>
     <button class="link-btn" id="cancel">zrušit</button>
   `, card => {
     card.querySelector('h2').textContent = station.name;

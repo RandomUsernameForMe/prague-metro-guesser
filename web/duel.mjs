@@ -197,7 +197,7 @@ function waitingCard(text, dead = false, invite = false) {
     <p id="duel-note"></p>
     ${invite ? `<p class="label">pošli kamarádovi tenhle odkaz</p>
       <input id="duel-link" readonly>
-      <button class="btn btn-ghost" id="duel-copy">Kopírovat odkaz</button>` : ''}
+      <button class="btn btn-outline" id="duel-copy">Kopírovat odkaz</button>` : ''}
     ${dead ? '<button class="link-btn" id="back">← zpět na začátek</button>' : ''}
   `, card => {
     card.querySelector('#duel-note').textContent = text; // text může nést nick → jen textContent
