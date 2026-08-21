@@ -13,6 +13,7 @@ if (!token) {
 }
 
 let ws = null, you = null, code = null, roundIdx = 0, showCard = null, onLeave = null;
+let iSubmitted = false;  // shot clock se hlásí jen tomu, kdo ještě kreslí
 
 export function initDuel({ card, leave }) {
   showCard = card;   // app.mjs umí vykreslit kartu do overlaye
@@ -48,7 +49,7 @@ function connect(c, note) {
   $('confirm').onclick = submit;   // v duelu potvrzení posílá tip, nevyhodnocuje kolo lokálně
   document.body.dataset.phase = 'duel';
   $('duel').hidden = false;
-  waitingCard(note ?? `Pošli kamarádovi odkaz — kód zápasu je ${code}.`);
+  waitingCard(note ?? 'Čekám na kamaráda.', false, true);
 }
 
 function handle(msg) {
@@ -56,12 +57,21 @@ function handle(msg) {
   switch (msg.type) {
     case 'state': return onState(msg);
     case 'round': return onRound(msg);
-    case 'deadline': return board.timerSetLeft(msg.msLeft);
+    case 'deadline': return onShotClock(msg);
     case 'opponent': return onOpponent(msg);
     case 'reveal': return onReveal(msg);
     case 'end': return onEnd(msg);
     case 'error': return waitingCard('Zápas je plný — tenhle kód už hrajou dva lidi.', true);
   }
+}
+
+// soupeř odevzdal → do konce kola zbývá jen shot clock, ať to hráč nepřehlédne
+function onShotClock(msg) {
+  board.timerSetLeft(msg.msLeft);
+  if (iSubmitted) return;
+  const el = $('duel-shot');
+  el.textContent = `Soupeř už odevzdal — máš posledních ${Math.ceil(msg.msLeft / 1000)} s!`;
+  el.hidden = false;
 }
 
 function onState(msg) {
@@ -70,14 +80,44 @@ function onState(msg) {
   $('duel-me').textContent = (msg.players.find(p => p.id === you)?.total ?? 0).toLocaleString('cs');
   $('duel-them').textContent = (them?.total ?? 0).toLocaleString('cs');
   $('duel-flag').className = `duel-flag ${them && !them.connected ? 'gone' : ''}`;
-  if (msg.phase === 'waiting') waitingCard(`Čekám na soupeře. Kód zápasu: ${code}`);
+  if (msg.phase === 'waiting') waitingCard('Čekám na soupeře.', false, true);
+  if (msg.phase === 'ready') readyCard(msg);
   if (msg.phase === 'countdown') waitingCard(`${them?.nick ?? 'Soupeř'} je tu. Začínáme!`);
   if (msg.phase === 'paused') waitingCard('Soupeř se odpojil — čekám 15 vteřin.');
   if (msg.phase === 'drawing' && !overlay.hidden) overlay.hidden = true; // návrat doprostřed kola
 }
 
+// oba museli potvrdit, že sedí u počítače — jinak zápas začne bez jednoho z nich
+function readyCard(msg) {
+  const me = msg.players.find(p => p.id === you);
+  const them = msg.players.find(p => p.id !== you);
+  showCard(`
+    <p class="label">duel · ${code}</p>
+    <h2>Soupeř nalezen</h2>
+    <p id="duel-note"></p>
+    <button class="btn btn-primary" id="ready-btn">Jsem připraven</button>
+  `, card => {
+    card.querySelector('#duel-note').textContent = them?.ready
+      ? `${them.nick} je připraven a čeká na tebe.`
+      : `${them?.nick ?? 'Soupeř'} zatím nepotvrdil. Zápas začne, až potvrdíte oba.`;
+    const btn = $('ready-btn');
+    if (me?.ready) return waitForOpponent(btn);
+    btn.onclick = () => {
+      waitForOpponent(btn);
+      ws?.send(JSON.stringify({ type: 'ready' }));
+    };
+  });
+}
+
+const waitForOpponent = btn => {
+  btn.disabled = true;
+  btn.textContent = 'Čekám na soupeře…';
+};
+
 function onRound(msg) {
   roundIdx = msg.i;
+  iSubmitted = false;
+  $('duel-shot').hidden = true;
   overlay.hidden = true;
   $('station-name').textContent = msg.name;
   $('round-label').textContent = `kolo ${msg.i + 1} z 10 · ${msg.lines.length > 1
@@ -97,6 +137,8 @@ function onRound(msg) {
 
 function submit() {
   board.timerStop();
+  iSubmitted = true;
+  $('duel-shot').hidden = true;
   $('confirm').disabled = true;
   $('clear').disabled = true;
   ws?.send(JSON.stringify({ type: 'submit', i: roundIdx, lines: board.segments() }));
@@ -109,6 +151,7 @@ function onOpponent(msg) {
 
 function onReveal(msg) {
   board.timerStop();
+  $('duel-shot').hidden = true;
   board.revealAxes(msg.axes);
   $('duel-me').textContent = msg.totals[you].toLocaleString('cs');
   const themId = Object.keys(msg.totals).find(id => id !== you);
@@ -125,10 +168,14 @@ function onReveal(msg) {
 
 function onEnd(msg) {
   board.timerStop();
+  $('duel-shot').hidden = true;
   const themId = Object.keys(msg.totals).find(id => id !== you);
-  const verdict = msg.reason === 'forfeit'
-    ? (msg.winner === you ? 'Soupeř se odpojil — vyhrál jsi' : 'Odpojil ses — zápas propadl')
-    : msg.winner === null ? 'Remíza' : msg.winner === you ? 'Vyhrál jsi!' : 'Prohrál jsi';
+  const verdict = msg.reason === 'noshow'
+    ? (msg.winner === null ? 'Nikdo nepotvrdil — zápas zrušen'
+      : msg.winner === you ? 'Soupeř nepotvrdil — vyhrál jsi' : 'Nepotvrdil jsi včas — zápas propadl')
+    : msg.reason === 'forfeit'
+      ? (msg.winner === you ? 'Soupeř se odpojil — vyhrál jsi' : 'Odpojil ses — zápas propadl')
+      : msg.winner === null ? 'Remíza' : msg.winner === you ? 'Vyhrál jsi!' : 'Prohrál jsi';
   showCard(`
     <p class="label">konec zápasu · ${code}</p>
     <h2>${verdict}</h2>
@@ -142,14 +189,35 @@ function onEnd(msg) {
   ws = null;
 }
 
-function waitingCard(text, dead = false) {
+// invite = čekáme na soupeře a hráč má co poslat kamarádovi
+function waitingCard(text, dead = false, invite = false) {
   showCard(`
     <p class="label">duel</p>
     <h2>${dead ? 'Konec' : 'Duel'}</h2>
     <p id="duel-note"></p>
+    ${invite ? `<p class="label">pošli kamarádovi tenhle odkaz</p>
+      <input id="duel-link" readonly>
+      <button class="btn btn-ghost" id="duel-copy">Kopírovat odkaz</button>` : ''}
     ${dead ? '<button class="link-btn" id="back">← zpět na začátek</button>' : ''}
   `, card => {
     card.querySelector('#duel-note').textContent = text; // text může nést nick → jen textContent
+    if (invite) wireInvite();
     if (dead) $('back').onclick = () => onLeave();
   });
+}
+
+function wireInvite() {
+  const url = new URL(`/?duel=${code}`, location.href).href;
+  const btn = $('duel-copy');
+  $('duel-link').value = url;
+  btn.onclick = async () => {
+    try {
+      // clipboard API je jen v zabezpečeném kontextu a může ho odmítnout i uživatel
+      await navigator.clipboard.writeText(url);
+      btn.textContent = 'Zkopírováno ✓';
+    } catch {
+      $('duel-link').select();
+      btn.textContent = 'Označeno — zkopíruj ručně';
+    }
+  };
 }

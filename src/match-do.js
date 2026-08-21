@@ -60,8 +60,10 @@ export class MatchDO {
     const { seat, code, session, ip } = ws.deserializeAttachment();
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
-    if (msg.type !== 'submit') return;
     await this.load(code);
+
+    if (msg.type === 'ready') return this.apply({ type: 'ready', playerId: seat }, Date.now());
+    if (msg.type !== 'submit') return;
 
     const round = this.rounds[msg.i];
     if (!round) return;

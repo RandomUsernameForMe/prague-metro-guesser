@@ -13,7 +13,11 @@ const open = (who, token) => new Promise(resolve => {
   const ws = new WebSocket(`${base}/api/duel/${code}?player=${token}&nick=${who}&session=${session}`);
   ws.addEventListener('message', e => {
     const msg = JSON.parse(e.data);
-    seen[who].push(msg.type);
+    seen[who].push(msg.type === 'state' ? `state:${msg.phase}` : msg.type);
+    // zápas se bez potvrzení obou nerozjede — ready check je brána před prvním kolem
+    if (msg.type === 'state' && msg.phase === 'ready') {
+      setTimeout(() => ws.send(JSON.stringify({ type: 'ready' })), who === 'a' ? 100 : 600);
+    }
     if (msg.type === 'round') {
       // kolo přišlo i s výřezem → nakresli úsečku doprostřed a odevzdej
       const { lat, lng } = msg.viewport;
@@ -32,6 +36,8 @@ a.close(); b.close();
 console.log('kód:', code);
 console.log('a:', seen.a.join(' → '));
 console.log('b:', seen.b.join(' → '));
-const ok = seen.a.includes('round') && seen.a.includes('deadline') && seen.a.includes('reveal');
-console.log(ok ? 'OK' : 'CHYBA: chybí round/deadline/reveal');
+const need = ['state:ready', 'state:countdown', 'round', 'deadline', 'reveal'];
+const missing = need.filter(t => !seen.a.includes(t));
+console.log(missing.length ? `CHYBA: chybí ${missing.join(', ')}` : 'OK');
+const ok = !missing.length;
 process.exit(ok ? 0 : 1);

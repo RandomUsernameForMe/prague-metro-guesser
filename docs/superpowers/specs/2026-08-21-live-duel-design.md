@@ -16,6 +16,7 @@ tréninkové režimy zůstávají beze změny.
 | Čas kola | 20 s (stanice s jednou linkou), 30 s (přestup) — stejné jako dnes |
 | Shot clock | První odevzdání zkrátí deadline na `min(deadline, now + 5 s)` |
 | Párování | Privátní kód/link **i** veřejná fronta |
+| Start zápasu | Ready check: oba musí potvrdit do 60 s, jinak nepotvrzený prohrává |
 | Odpojení | Pauza, grace 15 s, pak výhra kontumací |
 | Infra | Přesun z Pages na Worker se `assets` bindingem |
 
@@ -67,7 +68,7 @@ Stav v DO storage (přežije hibernaci):
 
 ```js
 { code, roundMs: [10], phase, roundIndex, deadline, order: ['a', 'b'],
-  players: { [id]: { nick, connected, total, submitted, score } },
+  players: { [id]: { nick, connected, ready, total, submitted, score } },
   pausedPhase, pausedRemainingMs, winner, reason }
 ```
 
@@ -76,14 +77,17 @@ Sedadlo (`'a'` / `'b'`) přiděluje `MatchDO` podle pořadí připojení a mapu
 se nikdy neposílá, jinak by šlo převzít jeho místo při návratu.
 
 ```
-waiting ──oba připojeni──> countdown(3 s) ──> drawing(N)
-                                                 │
-                        deadline nebo oba odevzdali
-                                                 ↓
-                                            reveal(N, 3 s)
-                                                 │
-                                    N < 9 ───────┘ (zpět do drawing(N+1))
-                                    N = 9 ───────> ended
+waiting ──oba připojeni──> ready(60 s) ──oba potvrdili──> countdown(3 s)
+                               │                                    │
+              vypršelo ────────┴──> ended (noshow)                  ↓
+                                                                drawing(N)
+                                                                    │
+                                           deadline nebo oba odevzdali
+                                                                    ↓
+                                                            reveal(N, 3 s)
+                                                                    │
+                                              N < 9 ────────────────┘ (zpět do drawing(N+1))
+                                              N = 9 ────────────> ended
 
 kdykoli: disconnect ──> paused (alarm 15 s) ──reconnect──> zpět do předchozí fáze
                                              └──vypršelo──> ended (forfeit)
@@ -118,6 +122,7 @@ proč mu zmizel čas.
 | S→K | `opponent` | `{ id, connected, submitted }` |
 | S→K | `reveal` | `{ i, axes, scores: {a, b}, totals: {a, b} }` |
 | S→K | `end` | `{ totals, winner, reason }` |
+| K→S | `ready` | bez obsahu — potvrzení ve fázi `ready`; mimo ni se ignoruje |
 | K→S | `submit` | `{ i, lines }` — po `deadline` se zahodí, kolo je 0 |
 
 Každá zpráva s `deadline` nese i `msLeft` dopočtené v okamžiku odeslání. Klient
@@ -159,7 +164,7 @@ CREATE TABLE duels (
   nick_a TEXT, nick_b TEXT,
   score_a INTEGER, score_b INTEGER,
   winner TEXT,                 -- 'a' | 'b' | NULL při remíze
-  ended_reason TEXT,           -- 'complete' | 'forfeit'
+  ended_reason TEXT,           -- 'complete' | 'forfeit' | 'noshow'
   created_at TEXT DEFAULT (datetime('now'))
 );
 ```

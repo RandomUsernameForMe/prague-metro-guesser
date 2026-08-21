@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS duels (
   score_a INTEGER NOT NULL,
   score_b INTEGER NOT NULL,
   winner TEXT,                  -- 'a' | 'b' | NULL při remíze
-  ended_reason TEXT NOT NULL,   -- 'complete' | 'forfeit'
+  ended_reason TEXT NOT NULL,   -- 'complete' | 'forfeit' | 'noshow'
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_duels_created ON duels(created_at DESC);
