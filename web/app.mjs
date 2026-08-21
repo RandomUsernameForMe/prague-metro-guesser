@@ -471,16 +471,16 @@ const tabBtn = (id, name) =>
      aria-selected="${id === introTab}" tabindex="${id === introTab ? 0 : -1}">${name}</button>`;
 
 // mezi režimy se liší jen druhý krok — casual nemá odpočet
+// jak se kreslí říká hint v prvním kole (board.maybeShowHint), tady se to neopakuje
 const step2 = tab => (tab === 'casual'
-  ? `Nakresli úsečku, kudy vede nástupiště.<br><span>Táhni prstem či myší, nebo klikni na začátek a konec. Žádný odpočet — koukej, jak dlouho chceš.</span>`
-  : `Za ${SECONDS.single} sekund nakresli úsečku, kudy vede nástupiště.<br><span>Táhni prstem či myší, nebo klikni na začátek a konec. U přestupní stanice kreslíš úsečku pro každou linku a máš ${SECONDS.transfer} s. Nestihneš to → 0 bodů.</span>`);
+  ? 'Nakresli úsečku, kudy vede nástupiště.'
+  : `Za ${SECONDS.single} sekund nakresli úsečku, kudy vede nástupiště.`);
 
+// bez úvodních odstavců — co který režim je, stojí v TAB_META nad kartou
 const introCta = (tab, played) => {
   if (tab === 'casual') return `
-    <p>Náhodné stanice pořád dokola, nic se nikam nezapisuje. Nejlepší na učení.</p>
     <button class="btn btn-primary" id="casual">Hrát casual</button>`;
   if (tab === 'duel') return `
-    <p>Stejných ${ROUNDS} kol pro oba naráz. Po každém kole vidíš, kdo byl blíž.</p>
     <button class="btn btn-primary" id="duel-find">Najít soupeře ve frontě</button>
     <button class="btn btn-outline" id="duel-host">${ICON.link}Pozvat kamaráda odkazem</button>`;
   return played
@@ -513,7 +513,6 @@ function showIntro(tab = introTab) {
     <div class="tabs" role="tablist" aria-label="režim hry">
       ${tabBtn('standard', 'Standard')}${tabBtn('duel', 'Duel')}${tabBtn('casual', 'Casual')}
     </div>
-    <p class="label">${TAB_META[tab]}</p>
     <ol class="steps">
       <li><b>1</b><div>Dostaneš letecký snímek 600 × 600 m a jméno stanice.<br><span>Stanice je někde uvnitř, ale pod zemí ji nevidíš.</span></div></li>
       <li><b>2</b><div>${step2(tab)}</div></li>
