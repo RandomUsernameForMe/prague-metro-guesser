@@ -1,4 +1,5 @@
-name = "prague-metro-guesser"
+# jméno workeru je zároveň první část adresy: kdejemetro.guth.workers.dev
+name = "kdejemetro"
 main = "src/index.js"
 compatibility_date = "2026-08-01"
 
