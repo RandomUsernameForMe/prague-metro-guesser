@@ -4,7 +4,10 @@ import * as guess from './api/guess.js';
 import * as report from './api/report.js';
 import * as stats from './api/stats.js';
 import * as exportCsv from './api/export.js';
+import * as adminIndex from './admin/index.js';
+import * as adminStats from './admin/stats.js';
 import * as adminReports from './admin/reports.js';
+import { guard } from './admin/auth.js';
 
 export { MatchDO } from './match-do.js';
 export { LobbyDO } from './lobby-do.js';
@@ -17,6 +20,13 @@ const ROUTES = {
   '/api/report': { POST: report.onRequestPost },
   '/api/stats': { GET: stats.onRequestGet },
   '/api/export': { GET: exportCsv.onRequestGet },
+};
+
+// celý /admin/* je za Basic Authem; '/admin' i '/admin/' vedou na přehled
+const ADMIN_ROUTES = {
+  '/admin': { GET: adminIndex.onRequestGet },
+  '/admin/': { GET: adminIndex.onRequestGet },
+  '/admin/stats': { GET: adminStats.onRequestGet },
   '/admin/reports': { GET: adminReports.onRequestGet },
 };
 
@@ -33,6 +43,14 @@ export default {
     if (match) {
       // kód zápasu je zároveň jméno objektu — žádná mapovací tabulka
       return env.MATCH.get(env.MATCH.idFromName(match[1])).fetch(request);
+    }
+
+    // heslo se ověřuje pro celý podstrom, ne jen pro známé routy
+    if (url.pathname === '/admin' || url.pathname.startsWith('/admin/')) {
+      const denied = await guard(request, env);
+      if (denied) return denied;
+      const admin = ADMIN_ROUTES[url.pathname]?.[request.method];
+      return admin ? admin({ request, env }) : new Response('not found', { status: 404 });
     }
 
     const handler = ROUTES[url.pathname]?.[request.method];
