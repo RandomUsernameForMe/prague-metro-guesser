@@ -21,9 +21,19 @@ export function initDuel({ card, leave }) {
   onLeave = leave;   // návrat na úvodní obrazovku
 }
 
+// Bez tohohle vypadá každé selhání jako mrtvé tlačítko: kliknutí spustí async funkci,
+// ta se zhroutí do unhandled rejection a na obrazovce nezůstane vůbec nic.
+const failCard = text => waitingCard(`${text} Zkus to prosím znovu.`, true);
+
 export async function findOpponent() {
-  const res = await fetch('/api/duel/queue', { method: 'POST' });
-  const { code: c, host } = await res.json();
+  let c, host;
+  try {
+    const res = await fetch('/api/duel/queue', { method: 'POST' });
+    if (!res.ok) throw new Error(`server odpověděl ${res.status}`);
+    ({ code: c, host } = await res.json());
+  } catch (e) {
+    return failCard(`Frontu se nepodařilo otevřít (${e.message}).`);
+  }
   // i „nalezený" zápas může být prázdný, když protějšek mezitím zavřel kartu — slibovat se to nedá
   connect(c, host ? 'Čekám na soupeře — vydrž, hledám ho ve frontě.' : 'Našel jsem volný zápas, připojuji tě.');
 }
@@ -45,7 +55,12 @@ function connect(c, note) {
   const url = new URL(`/api/duel/${code}`, location.href);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
   url.search = new URLSearchParams({ player: token, nick, session });
-  ws = new WebSocket(url);
+  try {
+    ws = new WebSocket(url);
+  } catch (e) {
+    // konstruktor umí házet (blokované schéma, mixed content) — pak by karta nikdy nedorazila
+    return failCard(`Spojení se nepodařilo otevřít (${e.message}).`);
+  }
   ws.onmessage = e => handle(JSON.parse(e.data));
   ws.onclose = () => { board.timerStop(); waitingCard('Spojení se serverem spadlo.', true); };
   $('confirm').onclick = submit;   // v duelu potvrzení posílá tip, nevyhodnocuje kolo lokálně
