@@ -38,7 +38,15 @@ if (cache && existsSync(cache)) {
 }
 
 const nodes = data.elements.filter(e => e.type === 'node');
-const ways = data.elements.filter(e => e.type === 'way');
+// linku bere z tagů way. Node stanice se na to použít nedá: na Florenci leží node C přímo
+// pod tunelem B (28 m), takže „nejbližší node" prohlásil koleje B za linku C.
+// část ways colour nemá, ale všechny provozní mají name „Metro X“; bez obojího jsou to
+// zkušební a depo koleje (Zličín, Depo Hostivař) — ty do os nepatří
+const lineOfWay = w => LINE_BY_COLOUR[w.tags.colour] ?? (w.tags.name ?? '').match(/^Metro ([ABC])$/)?.[1];
+const ways = data.elements
+  .filter(e => e.type === 'way')
+  .map(w => ({ line: lineOfWay(w), geometry: w.geometry }))
+  .filter(w => w.line);
 console.log(`${nodes.length} station nodes, ${ways.length} track ways`);
 
 // merge nody stejného jména (přestupní stanice mívají node per linka)
@@ -52,6 +60,8 @@ for (const n of nodes) {
 const distTo = (lat, lng, n) => Math.hypot(...toLocalMeters(lat, lng, { lat: n.lat, lng: n.lon }));
 
 // ponytail: clipping po vrcholech (bez interpolace hranice) — track ways mají husté nody, stačí
+// stationNodes jsou jen nody dané linky: podle nodu druhé linky (na Florenci 125 m stranou)
+// by se úsek natáhl mimo nástupiště a střední osa by skončila posunutá
 function clipAxes(stationNodes, way) {
   const axes = [];
   let run = [];
@@ -60,13 +70,7 @@ function clipAxes(stationNodes, way) {
     else if (run.length) { axes.push(run); run = []; }
   }
   if (run.length) axes.push(run);
-  // linku určí node, ke kterému se úsek nejvíc přiblíží — node stanice leží nad svými kolejemi,
-  // kdežto koleje druhé linky míjí i 90 m daleko (Muzeum)
-  const nodeDist = (pts, n) => Math.min(...pts.map(([lat, lng]) => distTo(lat, lng, n)));
-  return axes.filter(a => a.length >= 2).map(pts => {
-    const near = stationNodes.reduce((best, n) => (nodeDist(pts, n) < nodeDist(pts, best) ? n : best));
-    return { line: LINE_BY_COLOUR[near.tags.colour], pts };
-  });
+  return axes.filter(a => a.length >= 2).map(pts => ({ line: way.line, pts }));
 }
 
 const median = xs => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
@@ -134,13 +138,13 @@ function mergeAxes(axes, station) {
 const stations = [...byName.entries()].map(([name, ns]) => {
   const lat = ns.reduce((s, n) => s + n.lat, 0) / ns.length;
   const lng = ns.reduce((s, n) => s + n.lon, 0) / ns.length;
-  const raw = ways.flatMap(w => clipAxes(ns, w));
   const lines = [...new Set(ns.map(n => LINE_BY_COLOUR[n.tags.colour]))].sort();
   const station = { id: String(ns[0].id), name, lat, lng, lines, isTransfer: TRANSFERS.has(name) };
-  station.axes = lines.map(line => ({
-    line,
-    pts: mergeAxes(raw.filter(a => a.line === line), station),
-  }));
+  station.axes = lines.map(line => {
+    const lineNodes = ns.filter(n => LINE_BY_COLOUR[n.tags.colour] === line);
+    const raw = ways.filter(w => w.line === line).flatMap(w => clipAxes(lineNodes, w));
+    return { line, pts: mergeAxes(raw, station) };
+  });
   return station;
 }).sort((a, b) => a.name.localeCompare(b.name, 'cs'));
 
