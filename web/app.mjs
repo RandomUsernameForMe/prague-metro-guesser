@@ -36,6 +36,14 @@ const vp = () => roundViewport(rounds[roundIdx]);
 // markup níže je vždy statická šablona aplikace + čísla; DOMParser navíc nespouští skripty
 const parseHtml = markup => [...new DOMParser().parseFromString(markup, 'text/html').body.childNodes];
 
+const svg = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const ICON = {
+  warn: svg('<path d="M12 3 2 21h20L12 3Z"/><path d="M12 10v4.5"/><path d="M12 17.5h.01"/>'),
+  link: svg('<path d="M9.5 14.5 14.5 9.5"/><path d="M11 6.5 12.8 4.7a4 4 0 1 1 5.7 5.7l-1.8 1.8"/>'
+    + '<path d="M13 17.5l-1.8 1.8a4 4 0 1 1-5.7-5.7l1.8-1.8"/>'),
+};
+
 $('home').onclick = () => showIntro();
 
 // ---------- panel ----------
@@ -175,8 +183,8 @@ function renderResult(station, big, detail, segments) {
     <div class="big">${big}</div>
     <p>${detail}</p>
     <button class="btn btn-primary" id="next">${nextLabel()}</button>
+    <button class="btn btn-outline" id="report">${ICON.warn}Stanice je zadaná špatně</button>
     ${mode === 'casual' ? '<button class="link-btn" id="back">← zpět na začátek</button>' : ''}
-    <button class="link-btn" id="report">stanice je v aplikaci zadaná špatně</button>
   `, card => {
     card.querySelector('h2').textContent = station.name;
     $('next').onclick = advance;
@@ -196,12 +204,12 @@ function showReportCard(ctx) {
     <p>${fix
       ? 'Osu máš zakreslenou. Přidej komentář, jestli je co dodat, a odešli.'
       : 'Zakresli do mapy, kudy osa nástupiště vede doopravdy. Čas při tom neběží.'}</p>
-    <button class="btn ${fix ? 'btn-ghost' : 'btn-primary'}" id="draw-fix">
+    <button class="btn ${fix ? 'btn-outline' : 'btn-primary'}" id="draw-fix">
       ${fix ? 'Překreslit osu' : 'Zakreslit správnou osu'}
     </button>
     <textarea id="note" maxlength="1000" rows="3" placeholder="Komentář (nepovinný)"></textarea>
     <p class="error" id="report-err"></p>
-    <button class="btn ${fix ? 'btn-primary' : 'btn-ghost'}" id="send">Odeslat</button>
+    <button class="btn ${fix ? 'btn-primary' : 'btn-outline'}" id="send">Odeslat</button>
     <button class="link-btn" id="cancel">zrušit</button>
   `, card => {
     card.querySelector('h2').textContent = station.name;
@@ -286,9 +294,9 @@ function finishWarmup() {
     <p>Tyhle stanice v týdenní výzvě nebudou — teď víš, na čem jsi.</p>
     ${played
       ? `<button class="btn btn-primary" id="again">Rozehřát znovu</button>
-         <button class="btn btn-ghost" id="lb">Žebříček</button>`
+         <button class="btn btn-outline" id="lb">Žebříček</button>`
       : `<button class="btn btn-primary" id="play">Hrát týdenní výzvu na ostro</button>
-         <button class="btn btn-ghost" id="again">Ještě jednou na nečisto</button>`}
+         <button class="btn btn-outline" id="again">Ještě jednou na nečisto</button>`}
     <button class="link-btn" id="back">← zpět na začátek</button>
   `, () => {
     if (played) $('lb').onclick = () => showLeaderboard(played);
@@ -346,7 +354,7 @@ async function showLeaderboard(me) {
     <p class="label">žebříček</p>
     <h2>Týden ${week}</h2>
     <div id="lb-list"><p>Načítám…</p></div>
-    <button class="btn btn-ghost" id="train">Casual mode</button>
+    <button class="btn btn-outline" id="train">Casual mode</button>
     <button class="link-btn" id="back">← zpět na začátek</button>
   `, () => {
     $('train').onclick = startCasual;
@@ -449,46 +457,92 @@ function askNick(then) {
 }
 
 // ---------- úvod + tutoriál ----------
-function showIntro() {
+// tři režimy = tři barvy linek: standard červená (C), duel žlutá (B), casual zelená (A)
+const TABS = ['standard', 'duel', 'casual'];
+const TAB_META = {
+  standard: `${ROUNDS} stanic · na čas · zápis do žebříčku`,
+  duel: '1v1 · stejná kola · kdo je blíž',
+  casual: 'bez času · bez konce · bez zápisu',
+};
+let introTab = 'standard';
+
+const tabBtn = (id, name) =>
+  `<button class="tab ${id}" role="tab" id="tab-${id}" data-tab="${id}"
+     aria-selected="${id === introTab}" tabindex="${id === introTab ? 0 : -1}">${name}</button>`;
+
+// mezi režimy se liší jen druhý krok — casual nemá odpočet
+const step2 = tab => (tab === 'casual'
+  ? `Nakresli úsečku, kudy vede nástupiště.<br><span>Táhni prstem či myší, nebo klikni na začátek a konec. Žádný odpočet — koukej, jak dlouho chceš.</span>`
+  : `Za ${SECONDS.single} sekund nakresli úsečku, kudy vede nástupiště.<br><span>Táhni prstem či myší, nebo klikni na začátek a konec. U přestupní stanice kreslíš úsečku pro každou linku a máš ${SECONDS.transfer} s. Nestihneš to → 0 bodů.</span>`);
+
+const introCta = (tab, played) => {
+  if (tab === 'casual') return `
+    <p>Náhodné stanice pořád dokola, nic se nikam nezapisuje. Nejlepší na učení.</p>
+    <button class="btn btn-primary" id="casual">Hrát casual</button>`;
+  if (tab === 'duel') return `
+    <p>Stejných ${ROUNDS} kol pro oba naráz. Po každém kole vidíš, kdo byl blíž.</p>
+    <button class="btn btn-primary" id="duel-find">Najít soupeře ve frontě</button>
+    <button class="btn btn-outline" id="duel-host">${ICON.link}Pozvat kamaráda odkazem</button>`;
+  return played
+    ? `<p>Týdenní výzvu už jsi tenhle týden odehrál jako <strong id="played-nick"></strong>.</p>
+       <button class="btn btn-primary" id="warmup">Rozehřátí — ${ROUNDS} stanic na nečisto</button>
+       <button class="btn btn-outline" id="lb">Žebříček</button>`
+    : `<button class="btn btn-primary" id="play">Hrát týdenní výzvu</button>
+       <button class="btn btn-outline" id="warmup">Rozehřátí — ${ROUNDS} stanic na nečisto</button>`;
+};
+
+function showIntro(tab = introTab) {
+  const switching = tab !== introTab; // přepnutí tabu nemá kartu znovu rozanimovat
+  introTab = tab;
   const played = localStorage.getItem(playedKey);
   reportDraw = null;
   board.timerStop();
   document.body.dataset.phase = 'intro';
+  document.body.dataset.mode = tab;
   setBackdrop(); // úvod dostane fotku bez stanice
   $('station-name').textContent = 'Kde vede metro?';
   $('line-badges').replaceChildren();
-  $('round-label').textContent = 'týdenní výzva o 10 stanicích';
+  $('round-label').textContent = TAB_META[tab];
   $('progress').replaceChildren();
+  $('duel').hidden = true;
   $('home').hidden = true;
   $('confirm').disabled = true;
   showCard(`
     <p class="label">pražské metro · týden ${week}</p>
     <h2>Metro Guesser</h2>
+    <div class="tabs" role="tablist" aria-label="režim hry">
+      ${tabBtn('standard', 'Standard')}${tabBtn('duel', 'Duel')}${tabBtn('casual', 'Casual')}
+    </div>
+    <p class="label">${TAB_META[tab]}</p>
     <ol class="steps">
       <li><b>1</b><div>Dostaneš letecký snímek 600 × 600 m a jméno stanice.<br><span>Stanice je někde uvnitř, ale pod zemí ji nevidíš.</span></div></li>
-      <li><b>2</b><div>Za ${SECONDS.single} sekund nakresli úsečku, kudy vede nástupiště.<br><span>Táhni prstem či myší, nebo klikni na začátek a konec. U přestupní stanice kreslíš úsečku pro každou linku a máš ${SECONDS.transfer} s. Nestihneš to → 0 bodů.</span></div></li>
+      <li><b>2</b><div>${step2(tab)}</div></li>
       <li><b>3</b><div>Potvrdíš a uvidíš skutečnou osu kolejí.<br><span>Čím blíž jsi trefil, tím víc bodů — max 1000 za kolo.</span></div></li>
     </ol>
-    ${played
-      ? `<p>Týdenní výzvu už jsi tenhle týden odehrál jako <strong id="played-nick"></strong>.</p>
-         <button class="btn btn-primary" id="warmup">Rozehřátí (${ROUNDS} stanic na nečisto)</button>
-         <button class="btn btn-ghost" id="lb">Žebříček</button>`
-      : `<button class="btn btn-primary" id="play">Týdenní výzva na ostro</button>
-         <button class="btn btn-ghost" id="warmup">Rozehřátí — ${ROUNDS} stanic na nečisto</button>`}
-    <button class="link-btn" id="casual">casual mode — bez času, bez konce, bez zápisu</button>
-    <button class="link-btn" id="duel-find">duel proti někomu z fronty</button>
-    <button class="link-btn" id="duel-host">duel s kamarádem na odkaz</button>
+    <div class="cta">${introCta(tab, played)}</div>
   `, card => {
-    if (played) {
-      card.querySelector('#played-nick').textContent = played;
-      $('lb').onclick = () => showLeaderboard(played);
+    if (switching) card.style.animation = 'none';
+    card.querySelectorAll('.tab').forEach(t => {
+      t.onclick = () => showIntro(t.dataset.tab);
+      t.onkeydown = e => {
+        const dir = { ArrowLeft: -1, ArrowRight: 1 }[e.key];
+        if (!dir) return;
+        const next = TABS[(TABS.indexOf(introTab) + dir + TABS.length) % TABS.length];
+        showIntro(next);
+        $(`tab-${next}`).focus();
+      };
+    });
+    if (tab === 'casual') $('casual').onclick = startCasual;
+    else if (tab === 'duel') {
+      $('duel-find').onclick = () => askNick(findOpponent);
+      $('duel-host').onclick = () => askNick(hostDuel);
     } else {
-      $('play').onclick = startWeekly;
+      $('warmup').onclick = startWarmup;
+      if (played) {
+        card.querySelector('#played-nick').textContent = played;
+        $('lb').onclick = () => showLeaderboard(played);
+      } else $('play').onclick = startWeekly;
     }
-    $('warmup').onclick = startWarmup;
-    $('casual').onclick = startCasual;
-    $('duel-find').onclick = () => askNick(findOpponent);
-    $('duel-host').onclick = () => askNick(hostDuel);
   });
 }
 

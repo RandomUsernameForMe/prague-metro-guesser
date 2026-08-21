@@ -15,8 +15,20 @@
   --on-accent: #fff;
   --draw: #ff2d6f;         /* hráčova čára */
 
+  /* barva režimu — čte ji jen úvodní karta s výběrem režimu */
+  --mode: var(--c);
+  --on-mode: #fff;
+
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+/* casual zelená, duel žlutá, standard červená — jako linky A/B/C */
+body[data-mode='standard'] { --mode: var(--c); --on-mode: #fff; }
+body[data-mode='duel'] { --mode: var(--b); --on-mode: #1a1400; }
+body[data-mode='casual'] { --mode: var(--a); --on-mode: #fff; }
+/* Ve výběru režimu vede barva režimu celou obrazovku — panel, pozadí, karta.
+   Deklarace na body přebije --accent, který JS nastavuje na :root podle linky stanice. */
+body[data-phase='intro'] { --accent: var(--mode); --on-accent: var(--on-mode); }
 
 * { margin: 0; box-sizing: border-box; }
 
@@ -198,10 +210,17 @@ body[data-phase='casual'] #controls { margin-top: auto; }
 .btn:active:not(:disabled) { transform: translateY(0); }
 .btn-primary { background: var(--accent); color: var(--on-accent); }
 .btn-primary:disabled { background: var(--hairline); color: var(--muted); cursor: default; }
-.btn-ghost { background: transparent; color: var(--text); box-shadow: inset 0 0 0 1px var(--hairline); }
+/* sekundární akce: rám místo výplně, ikona vlevo */
+.btn-outline {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  background: transparent; color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+}
+.btn-outline:hover:not(:disabled) { box-shadow: inset 0 0 0 1px var(--accent); }
+.btn-outline svg { width: 17px; height: 17px; flex: none; }
 .link-btn {
   background: none; border: 0; color: var(--muted); cursor: pointer;
-  font: 500 13px/1 Archivo, sans-serif; text-align: left; padding: 0;
+  font: 500 14px/1 Archivo, sans-serif; text-align: left; padding: 8px 0;
 }
 .link-btn:hover { color: var(--text); }
 .link-btn[hidden] { display: none; }
@@ -228,6 +247,7 @@ body[data-phase='casual'] #controls { margin-top: auto; }
   display: grid; gap: 16px;
   box-shadow: 0 30px 90px -30px #000;
   animation: rise 0.4s var(--ease);
+  transition: border-color 0.3s var(--ease);
 }
 .card h2 {
   font: 400 clamp(24px, 3vw, 34px)/1 Anton, sans-serif;
@@ -239,6 +259,28 @@ body[data-phase='casual'] #controls { margin-top: auto; }
   font-variant-numeric: tabular-nums;
 }
 .card .btn { width: 100%; }
+
+/* ---------- taby režimů v úvodu ---------- */
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+.tab {
+  font: 600 13px/1 Archivo, sans-serif;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 15px 6px 12px; border: 0; cursor: pointer;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 3px solid color-mix(in srgb, var(--tab) 32%, transparent);
+  transition: color 0.2s var(--ease), background 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+.tab.standard { --tab: var(--c); }
+.tab.duel { --tab: var(--b); }
+.tab.casual { --tab: var(--a); }
+.tab:hover { color: var(--text); }
+.tab[aria-selected='true'] {
+  color: var(--text);
+  background: color-mix(in srgb, var(--tab) 16%, transparent);
+  border-bottom-color: var(--tab);
+}
+.cta { display: grid; gap: 10px; }
 
 /* tutoriál: kroky */
 .steps { list-style: none; padding: 0; display: grid; gap: 14px; }
@@ -316,10 +358,20 @@ body[data-phase='casual'] #controls { margin-top: auto; }
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 
-#duel { display: flex; gap: 12px; margin: 12px 0; }
-#duel .duel-side { flex: 1; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.06); }
-#duel .duel-side strong { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
-.duel-flag { font-size: 12px; opacity: .75; }
+/* ---------- duel: stav zápasu v panelu ---------- */
+#duel { display: flex; gap: 2px; }
+#duel[hidden] { display: none; }
+#duel .duel-side {
+  flex: 1; padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border-top: 3px solid var(--hairline);
+}
+#duel .duel-side:first-child { border-top-color: var(--b); } /* ty = žlutá, duel je linka B */
+#duel .duel-side strong {
+  display: block; margin-top: 2px;
+  font: 400 26px/1 Anton, sans-serif; font-variant-numeric: tabular-nums;
+}
+.duel-flag { font-size: 12px; color: var(--muted); }
 .duel-flag.waiting::before { content: 'kreslí…'; }
 .duel-flag.submitted::before { content: '✓ odevzdal'; }
 .duel-flag.gone::before { content: '⚠ odpojen'; }
