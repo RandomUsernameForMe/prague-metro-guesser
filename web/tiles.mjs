@@ -9,7 +9,8 @@ const SOURCES = [
 let srcIdx = 0;
 
 // dlaždice pokrývající výřez + jejich pozice ve stage
-function layout(vp, sizePx) {
+// (export kvůli scripts/build-brand.mjs, který skládá stejný výřez do OG obrázku)
+export function layout(vp, sizePx) {
   const halfLng = (VIEW_SIZE / 2) / mPerDegLng(vp.lat);
   const halfLat = (VIEW_SIZE / 2) / M_PER_DEG_LAT;
   const xW = lngToTileX(vp.lng - halfLng, Z) * TILE;

@@ -27,6 +27,20 @@ Pouští se ručně schválně: build nemá k D1 přístup (viz níž) a migrace
 nasadí sama, se sama i rozbije. Příkaz je idempotentní — už použité migrace
 přeskočí, protože si je D1 eviduje v tabulce `d1_migrations`.
 
+## Když se mění brand
+
+Ikony (`web/icon-*.png`, `web/apple-touch-icon.png`) a náhled sdílení
+(`web/og.jpg`) jsou v gitu jako hotové soubory, build je nedělá. Po změně barev
+nebo ikony je přegeneruj:
+
+```
+node scripts/build-brand.mjs
+```
+
+Potřebuje Google Chrome v `/Applications` a síť (do OG obrázku se skládají
+letecké dlaždice z ČÚZK). Trvá to asi minutu — Chrome po sobě snímek zapíše, ale
+sám neskončí, takže se čeká na timeout.
+
 ## Jednorázové nastavení
 
 Tohle uděláš jednou a už nikdy.
