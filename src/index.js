@@ -1,6 +1,7 @@
 import * as score from './api/score.js';
 import * as leaderboard from './api/leaderboard.js';
 import * as guess from './api/guess.js';
+import * as hardcore from './api/hardcore.js';
 import * as report from './api/report.js';
 import * as stats from './api/stats.js';
 import * as exportCsv from './api/export.js';
@@ -18,6 +19,7 @@ const ROUTES = {
   '/api/score': { POST: score.onRequestPost },
   '/api/leaderboard': { GET: leaderboard.onRequestGet },
   '/api/guess': { POST: guess.onRequestPost },
+  '/api/hardcore': { GET: hardcore.onRequestGet, POST: hardcore.onRequestPost },
   '/api/report': { POST: report.onRequestPost },
   '/api/stats': { GET: stats.onRequestGet },
   '/api/export': { GET: exportCsv.onRequestGet },

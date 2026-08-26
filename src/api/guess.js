@@ -1,5 +1,6 @@
 import stations from '../../web/stations.json';
-import { isoWeek } from '../../web/shared/seed.mjs';
+import { isoWeek, VIEW_SIZE } from '../../web/shared/seed.mjs';
+import { SPAN } from '../../web/shared/hardcore.mjs';
 import { scoreRound } from '../../web/shared/scoring.mjs';
 import { validateRound } from '../../web/shared/validate.mjs';
 import { ipHash } from '../hash.js';
@@ -7,7 +8,7 @@ import { ipHash } from '../hash.js';
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json' } });
 
-const MODES = new Set(['weekly', 'warmup', 'casual']);
+const MODES = new Set(['weekly', 'warmup', 'casual', 'hardcore']);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HOURLY_LIMIT = 300; // casual kolo trvá 20 s → poctivý hráč se sem nedostane
 const byId = new Map(stations.map(s => [s.id, s]));
@@ -26,7 +27,9 @@ export async function onRequestPost({ request, env }) {
   const station = byId.get(b.stationId);
   if (!station) return json({ error: 'station' }, 400);
   // úsečky musí ležet uvnitř výřezu, který si klient nárokuje — jinak je přepočet skóre nesmysl
-  const v = validateRound(b.segments, { station, u: b.u, v: b.v }, { allowPartial: b.forfeited });
+  // hardcore kreslí do pootočeného plátna, tam sahají tahy až do rohů
+  const span = b.mode === 'hardcore' ? VIEW_SIZE * SPAN : VIEW_SIZE;
+  const v = validateRound(b.segments, { station, u: b.u, v: b.v }, { allowPartial: b.forfeited, span });
   if (!v.ok) return json({ error: v.error }, 400);
 
   const ip = await ipHash(request.headers.get('cf-connecting-ip'), env);
