@@ -58,6 +58,7 @@ const ICON = {
     + 'c1.7-1.2 3-3.2 3-5.8C20 5.4 16.4 2 12 2Z"/><circle cx="9" cy="10" r="1.7" fill="currentColor" stroke="none"/>'
     + '<circle cx="15" cy="10" r="1.7" fill="currentColor" stroke="none"/>'
     + '<path d="M12 13v2"/><path d="M9.5 20v-2.6"/><path d="M14.5 20v-2.6"/>'),
+  heart: svg('<path d="M12 20S3.5 14.5 3.5 8.9A4.9 4.9 0 0 1 12 5.6a4.9 4.9 0 0 1 8.5 3.3C20.5 14.5 12 20 12 20Z"/>'),
 };
 
 $('home').onclick = () => showIntro();
@@ -710,6 +711,9 @@ function showIntro(tab = introTab) {
   document.body.dataset.phase = 'intro';
   document.body.dataset.mode = tab;
   setBackdrop(); // úvod dostane fotku bez stanice
+  document.title = tab === 'hardcore'
+    ? 'Metro Guesser Hardcore — přežiješ?'
+    : 'Metro Guesser — kde vede pražské metro?';
   $('station-name').textContent = 'Kde vede metro?';
   $('line-badges').replaceChildren();
   $('round-label').textContent = TAB_META[tab];
@@ -718,10 +722,13 @@ function showIntro(tab = introTab) {
   $('home').hidden = true;
   $('confirm').disabled = true;
   showCard(`
-    <button class="skull ${introTab === 'hardcore' ? 'on' : ''}" id="go-hc"
-      aria-label="Hardcore mode" title="Hardcore">${ICON.skull}</button>
+    ${tab === 'hardcore'
+      ? `<button class="skull softcore" id="go-hc" aria-label="Softcore mode"
+           title="Softcore">${ICON.heart}<span>softcore</span></button>`
+      : `<button class="skull" id="go-hc" aria-label="Hardcore mode"
+           title="Hardcore">${ICON.skull}<span>hardcore</span></button>`}
     <p class="label">pražské metro · týden ${week}</p>
-    <h2>Metro Guesser</h2>
+    <h2>Metro Guesser${tab === 'hardcore' ? ' Hardcore' : ''}</h2>
     <div class="tabs" role="tablist" aria-label="režim hry">
       ${tabBtn('standard', 'Standard')}${tabBtn('duel', 'Duel')}${tabBtn('casual', 'Casual')}
     </div>
@@ -733,7 +740,7 @@ function showIntro(tab = introTab) {
     <div class="cta">${introCta(tab, played)}</div>
   `, card => {
     if (switching) card.style.animation = 'none';
-    $('go-hc').onclick = () => showIntro('hardcore');
+    $('go-hc').onclick = () => showIntro(tab === 'hardcore' ? 'standard' : 'hardcore');
     card.querySelectorAll('.tab').forEach(t => {
       t.onclick = () => showIntro(t.dataset.tab);
       t.onkeydown = e => {
