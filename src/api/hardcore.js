@@ -9,6 +9,7 @@ const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json' } });
 
 const NICK_RE = /^[\p{L}\p{N} _-]{3,16}$/u;
+const MAX_SAME_NICK = 20; // pojistka proti nekonečnému hledání volného čísla
 const SPAN_M = VIEW_SIZE * SPAN; // hardcore rotuje, tahy sahají až do rohů plátna
 
 // Dvacítka nejlepších plus řádek hráče ?nick=, i když je až někde dole; pořadí počítá SQL.
@@ -55,14 +56,21 @@ export async function onRequestPost({ request, env }) {
   ).bind(ip).first();
   if (cnt >= 10) return json({ error: 'rate limit' }, 429);
 
-  // žebříček je all-time, takže se zapisuje jen lepší run než ten uložený
-  await env.DB.prepare(
+  // Žebříček je all-time: vlastní run jen vylepší uložený rekord (poznáme podle otisku
+  // IP), cizí jmenovec dostane pořadové číslo — "Maty (2)" — ať o zápis nepřijde.
+  const upsert = env.DB.prepare(
     `INSERT INTO hardcore (nick, rounds, seed, run_json, ip_hash) VALUES (?, ?, ?, ?, ?)
      ON CONFLICT(nick) DO UPDATE SET
        rounds = excluded.rounds, seed = excluded.seed, run_json = excluded.run_json,
        ip_hash = excluded.ip_hash, created_at = datetime('now')
      WHERE excluded.rounds > hardcore.rounds`
-  ).bind(b.nick, played, b.seed, JSON.stringify(b.rounds), ip).run();
-
-  return json({ rounds: played });
+  );
+  for (let n = 1; n <= MAX_SAME_NICK; n++) {
+    const nick = n === 1 ? b.nick : `${b.nick} (${n})`;
+    const owner = await env.DB.prepare('SELECT ip_hash FROM hardcore WHERE nick = ?').bind(nick).first();
+    if (owner && owner.ip_hash !== ip) continue;
+    await upsert.bind(nick, played, b.seed, JSON.stringify(b.rounds), ip).run();
+    return json({ rounds: played, nick });
+  }
+  return json({ error: 'nick taken' }, 409);
 }

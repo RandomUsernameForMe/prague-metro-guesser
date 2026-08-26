@@ -436,8 +436,10 @@ async function submitScore() {
     const data = await res.json();
     if (!res.ok) {
       $('submit-err').textContent = data.error === 'nick' ? NICK_HELP
-        : data.error === 'rate limit' ? 'Moc zápisů za sebou — zkus to za chvíli.'
-          : `Zápis se nepovedl (${data.error}) — zkus to znovu.`;
+        : data.error === 'already played' ? 'Týdenní výzvu už jsi pod touhle přezdívkou zapsal — platí první pokus.'
+          : data.error === 'nick taken' ? 'Tuhle přezdívku už tenhle týden zabralo moc lidí — zvol jinou.'
+            : data.error === 'rate limit' ? 'Moc zápisů za sebou — zkus to za chvíli.'
+              : `Zápis se nepovedl (${data.error}) — zkus to znovu.`;
       $('submit').disabled = false;
       return;
     }
@@ -510,14 +512,18 @@ async function submitRun() {
     });
     const data = await res.json();
     if (!res.ok) {
-      $('submit-err').textContent = data.error === 'nick'
-        ? 'Neplatná přezdívka (3–16 znaků)'
-        : data.error === 'rate limit' ? 'Moc runů za sebou — zkus to za chvíli.' : data.error;
+      $('submit-err').textContent = data.error === 'nick' ? NICK_HELP
+        : data.error === 'nick taken' ? 'Tuhle přezdívku už zabralo moc lidí — zvol jinou.'
+          : data.error === 'rate limit' ? 'Moc runů za sebou — zkus to za chvíli.'
+            : `Zápis se nepovedl (${data.error}) — zkus to znovu.`;
       $('submit').disabled = false;
       return;
     }
+    // pmg-nick se předvyplňuje do dalšího runu i do duelu, takže tam patří jméno bez
+    // čísla — pod jakým jménem hráč visí na žebříčku, si drží klíč vedle
     localStorage.setItem('pmg-nick', nick);
-    showSurvivors(nick);
+    localStorage.setItem('pmg-hc-nick', data.nick);
+    showSurvivors(data.nick);
   } catch {
     $('submit-err').textContent = 'Odeslání selhalo — zkus znovu';
     $('submit').disabled = false;
@@ -738,7 +744,7 @@ function showIntro(tab = introTab) {
     });
     if (tab === 'hardcore') {
       $('hc-play').onclick = startHardcore;
-      $('hc-lb').onclick = () => showSurvivors(localStorage.getItem('pmg-nick') ?? undefined);
+      $('hc-lb').onclick = () => showSurvivors(localStorage.getItem('pmg-hc-nick') ?? undefined);
     } else if (tab === 'casual') $('casual').onclick = startCasual;
     else if (tab === 'duel') {
       $('duel-find').onclick = () => askNick(findOpponent);

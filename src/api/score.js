@@ -33,14 +33,22 @@ export async function onRequestPost({ request, env }) {
   const score = rounds.reduce(
     (sum, r, i) => sum + (body.lines[i] === null ? 0 : scoreRound(body.lines[i], r.station).score), 0);
 
-  // Obsazená přezdívka není chyba: druhý zápis dostane pořadové číslo, takže na
-  // žebříčku zůstanou oba — "Maty", "Maty (2)", "Maty (3)". O volné jméno se pere
-  // UNIQUE(week, nick), ne předchozí SELECT, takže dva souběžné zápisy nesplynou.
+  // Týdenní výzva je jednorázová, ale dva různí lidé si klidně zvolí stejnou přezdívku.
+  // Kdo je kdo, se pozná podle otisku IP: vlastní druhý pokus se odmítne, cizímu
+  // jmenovci se přidá pořadové číslo — "Maty (2)". Přezdívku zabírá až INSERT, takže
+  // dva souběžné zápisy nesplynou; UNIQUE pošle druhý z nich na další číslo.
   const insert = env.DB.prepare(
     'INSERT INTO scores (week, nick, score, lines_json, ip_hash) VALUES (?, ?, ?, ?, ?)'
   );
   for (let n = 1; n <= MAX_SAME_NICK; n++) {
     const nick = n === 1 ? body.nick : `${body.nick} (${n})`;
+    const taken = await env.DB.prepare(
+      'SELECT ip_hash FROM scores WHERE week = ? AND nick = ?'
+    ).bind(week, nick).first();
+    if (taken) {
+      if (taken.ip_hash === ip) return reject('already played', { nick }, 409);
+      continue;
+    }
     try {
       await insert.bind(week, nick, score, JSON.stringify(body.lines), ip).run();
       return json({ score, week, nick });
@@ -48,5 +56,5 @@ export async function onRequestPost({ request, env }) {
       if (!String(e).includes('UNIQUE')) throw e;
     }
   }
-  return reject('nick už tento týden hrál', { nick: body.nick }, 409);
+  return reject('nick taken', { nick: body.nick }, 409);
 }
