@@ -3,7 +3,7 @@
 import { mulberry32, roundViewport, VIEW_SIZE } from './seed.mjs';
 
 export const LIVES_MAX = 3;
-export const LOSE_M = 100;   // horší kolo bere život
+export const LOSE_M = 69;    // horší kolo bere život
 export const GAIN_M = 20;    // lepší kolo život vrací, dvacítka se ještě počítá
 export const SPAN = Math.SQRT2;  // plátno vs. výřez, ať pootočený čtverec nekouká do rohů
 export const MAX_ROUNDS = 500;   // strop na velikost payloadu při odeslání runu

@@ -8,9 +8,10 @@ import { pxToLatLng, latLngToPx } from '../web/tiles.mjs';
 import { M_PER_DEG_LAT } from '../web/shared/geo.mjs';
 import { validateRound } from '../web/shared/validate.mjs';
 
-test('nextLives: nad 100 m bere život', () => {
+test('nextLives: nad 69 m bere život', () => {
   assert.equal(nextLives(3, 140), 2);
-  assert.equal(nextLives(1, 100.1), 0);
+  assert.equal(nextLives(1, 69.1), 0);
+  assert.equal(nextLives(3, 69), 3, 'přesná 69 ještě neubližuje');
 });
 
 test('nextLives: 20 m a míň vrací život, ale nejvýš na strop', () => {
@@ -19,10 +20,10 @@ test('nextLives: 20 m a míň vrací život, ale nejvýš na strop', () => {
   assert.equal(nextLives(LIVES_MAX, 1), LIVES_MAX);
 });
 
-test('nextLives: mezi 20 a 100 m se nic neděje', () => {
+test('nextLives: mezi 20 a 69 m se nic neděje', () => {
   assert.equal(nextLives(2, 20.1), 2);
-  assert.equal(nextLives(2, 60), 2);
-  assert.equal(nextLives(2, 100), 2);
+  assert.equal(nextLives(2, 45), 2);
+  assert.equal(nextLives(2, 69), 2);
 });
 
 test('nextLives: propadlé kolo (null) bere život', () => {

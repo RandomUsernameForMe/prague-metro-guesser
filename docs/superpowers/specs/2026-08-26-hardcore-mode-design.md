@@ -15,8 +15,8 @@ průměr přes obě linky).
 | `d` | důsledek |
 |---|---|
 | ≤ 20 m | +1 život, nejvýš na 3 |
-| 20–100 m | nic |
-| > 100 m | −1 život |
+| 20–69 m | nic |
+| > 69 m | −1 život |
 | vypršel čas nebo chybí úsečka | −1 život |
 
 Start na třech životech, strop tři — zásoba se nedá nahromadit, takže tlak nikdy
@@ -77,7 +77,7 @@ Sekvence konce kola: narovnání 600 ms → najetí osy 1000 ms → výsledková
 ### Známá vada
 
 Kdo kreslí až v rohu pootočeného výřezu, tomu po narovnání kus čáry uteče za
-okraj `#stage`. Aby se tam dostal, musí být přes 100 m mimo — což je stejně
+okraj `#stage`. Aby se tam dostal, musí být přes 69 m mimo — což je stejně
 ztráta života. Neřeší se.
 
 ## 3. Co hardcore skryje
@@ -233,7 +233,7 @@ Obě díry má i dnešní weekly, takže hardcore je nezhoršuje:
 ```js
 // web/shared/hardcore.mjs
 export const LIVES_MAX = 3;
-export const LOSE_M = 100;   // horší kolo bere život
+export const LOSE_M = 69;    // horší kolo bere život
 export const GAIN_M = 20;    // lepší kolo život vrací, dvacítka se ještě počítá
 export const SPAN = Math.SQRT2;  // plátno vs. výřez, ať rotace nekouká do rohů
 export const MAX_ROUNDS = 500;

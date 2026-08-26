@@ -655,7 +655,7 @@ const step2 = tab => (tab === 'casual'
   ? 'Nakresli úsečku, kudy vede nástupiště.'
   : `Za ${SECONDS.single} sekund nakresli úsečku, kudy vede nástupiště.`);
 const step3 = tab => (tab === 'hardcore'
-  ? 'Potvrdíš, mapa se narovná a uvidíš skutečnou osu.<br><span>Odchylka nad 100 m bere život, 20 m a míň ho vrací. Máš tři.</span>'
+  ? 'Potvrdíš, mapa se narovná a uvidíš skutečnou osu.<br><span>Odchylka nad 69 m bere život, 20 m a míň ho vrací. Máš tři.</span>'
   : 'Potvrdíš a uvidíš skutečnou osu kolejí.<br><span>Čím blíž jsi trefil, tím víc bodů — max 1000 za kolo.</span>');
 
 // bez úvodních odstavců — co který režim je, stojí v TAB_META nad kartou
