@@ -2,7 +2,9 @@ import { isoWeek, weeklyChallenge, practiceRounds, roundViewport } from './share
 import { scoreRound } from './shared/scoring.mjs';
 import * as board from './board.mjs';
 import { initDuel, findOpponent, hostDuel, joinDuel } from './duel.mjs';
-import { hardcoreRound, hardcoreViewport, nextLives, LIVES_MAX, MAX_ROUNDS } from './shared/hardcore.mjs';
+import {
+  hardcoreRound, hardcoreViewport, nextLives, LIVES_MAX, LOSE_M, GAIN_M, MAX_ROUNDS,
+} from './shared/hardcore.mjs';
 
 const $ = id => document.getElementById(id);
 const overlay = $('overlay');
@@ -638,7 +640,7 @@ const TAB_META = {
   standard: `${ROUNDS} stanic · na čas · zápis do žebříčku`,
   duel: '1v1 · stejná kola · kdo je blíž',
   casual: 'bez času · bez konce · bez zápisu',
-  hardcore: '3 životy · mapa pootočená · bez jména stanice',
+  hardcore: `${LIVES_MAX} životy · mapa pootočená · bez jména stanice`,
 };
 let introTab = 'standard';
 
@@ -655,7 +657,9 @@ const step2 = tab => (tab === 'casual'
   ? 'Nakresli úsečku, kudy vede nástupiště.'
   : `Za ${SECONDS.single} sekund nakresli úsečku, kudy vede nástupiště.`);
 const step3 = tab => (tab === 'hardcore'
-  ? 'Potvrdíš, mapa se narovná a uvidíš skutečnou osu.<br><span>Odchylka nad 69 m bere život, 20 m a míň ho vrací. Máš tři.</span>'
+  // prahy se táhnou z konstant, ať text nezůstane pozadu, když se pravidlo doladí
+  ? `Potvrdíš, mapa se narovná a uvidíš skutečnou osu.<br><span>Odchylka nad ${LOSE_M} m bere život,
+     ${GAIN_M} m a míň ho vrací. Máš ${LIVES_MAX}.</span>`
   : 'Potvrdíš a uvidíš skutečnou osu kolejí.<br><span>Čím blíž jsi trefil, tím víc bodů — max 1000 za kolo.</span>');
 
 // bez úvodních odstavců — co který režim je, stojí v TAB_META nad kartou
