@@ -25,7 +25,8 @@ nepoleví. Životy na nule = konec runu.
 **Výsledek runu = počet odehraných kol včetně toho posledního, smrtícího.** Kdo
 umřel v 23. kole, má 23.
 
-Odpočet běží stejně jako jinde: 20 s na jednu úsečku, 30 s na přestup. Bodové
+Odpočet je kratší než jinde: 15 s na jednu úsečku, 22 s na přestup (stejný poměr
+jako 20/30 v ostatních režimech — dvě úsečky za 15 s nejsou). Bodové
 skóre se v hardcore nikde neukazuje — jediné číslo, na kterém záleží, je počet
 kol. V panelu proto na místě skóre běží počítadlo kol s popiskem `kola`. (Do
 `/api/guess` se kola logují dál i s body; jen se nezobrazují.)

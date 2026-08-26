@@ -23,6 +23,9 @@ let session = localStorage.getItem('pmg-session');
 if (!session) localStorage.setItem('pmg-session', (session = crypto.randomUUID()));
 
 const SECONDS = { single: 20, transfer: 30 }; // přestup chce dvě úsečky, dostane víc času
+// hardcore ubírá i čas; přestup si drží stejný poměr, dvě úsečky za 15 s nejdou
+const HARDCORE_SECONDS = { single: 15, transfer: 22 };
+const secondsOf = tab => (tab === 'hardcore' ? HARDCORE_SECONDS : SECONDS);
 const ROUNDS = 10;
 
 // weekly: ostrá výzva se zápisem · warmup: 10 stanic mimo výzvu, na nečisto · casual: bez času a bez konce
@@ -36,7 +39,7 @@ let hcSeed = 0, hcRun = [], lives = LIVES_MAX, lostThisRound = false;
 const hcBestKey = 'pmg-hc-best';
 
 const required = () => rounds[roundIdx].station.lines.length;
-const roundSeconds = () => (required() > 1 ? SECONDS.transfer : SECONDS.single);
+const roundSeconds = () => (required() > 1 ? secondsOf(mode).transfer : secondsOf(mode).single);
 
 const vp = () => (mode === 'hardcore'
   ? hardcoreViewport(rounds[roundIdx])   // větší plátno + náhodný úhel
@@ -640,7 +643,7 @@ const TAB_META = {
   standard: `${ROUNDS} stanic · na čas · zápis do žebříčku`,
   duel: '1v1 · stejná kola · kdo je blíž',
   casual: 'bez času · bez konce · bez zápisu',
-  hardcore: `${LIVES_MAX} životy · mapa pootočená · bez jména stanice`,
+  hardcore: `${LIVES_MAX} životy · ${HARDCORE_SECONDS.single} s · pootočená mapa · bez jména`,
 };
 let introTab = 'standard';
 
@@ -655,7 +658,7 @@ const step1 = tab => (tab === 'hardcore'
   : 'Dostaneš letecký snímek 600 × 600 m a jméno stanice.<br><span>Stanice je někde uvnitř, ale pod zemí ji nevidíš.</span>');
 const step2 = tab => (tab === 'casual'
   ? 'Nakresli úsečku, kudy vede nástupiště.'
-  : `Za ${SECONDS.single} sekund nakresli úsečku, kudy vede nástupiště.`);
+  : `Za ${secondsOf(tab).single} sekund nakresli úsečku, kudy vede nástupiště.`);
 const step3 = tab => (tab === 'hardcore'
   // prahy se táhnou z konstant, ať text nezůstane pozadu, když se pravidlo doladí
   ? `Potvrdíš, mapa se narovná a uvidíš skutečnou osu.<br><span>Odchylka nad ${LOSE_M} m bere život,
