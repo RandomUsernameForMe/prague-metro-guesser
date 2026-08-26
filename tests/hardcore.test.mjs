@@ -6,6 +6,7 @@ import {
 import { roundViewport, VIEW_SIZE } from '../web/shared/seed.mjs';
 import { pxToLatLng, latLngToPx } from '../web/tiles.mjs';
 import { M_PER_DEG_LAT } from '../web/shared/geo.mjs';
+import { validateRound } from '../web/shared/validate.mjs';
 
 test('nextLives: nad 100 m bere život', () => {
   assert.equal(nextLives(3, 140), 2);
@@ -96,4 +97,17 @@ test('px↔latlng: horní hrana plátna leží na jeho půlce, ne na půlce vý�
   const [lat] = pxToLatLng(0, 0, vp, 849);
   const north = (lat - vp.lat) * M_PER_DEG_LAT;
   assert.ok(Math.abs(north - (VIEW_SIZE * SPAN) / 2) < 1, `hrana je ${north} m od středu, čekáme 424`);
+});
+
+test('validateRound: bod v rohu plátna projde jen se span', () => {
+  const station = STATIONS[0];
+  const round = { station, u: 0.5, v: 0.5 };
+  const vp = roundViewport(round);
+  // 380 m na sever od středu výřezu — mimo 600m čtverec, uvnitř 849m plátna
+  const far = vp.lat + 380 / M_PER_DEG_LAT;
+  const segments = [[[far, vp.lng - 0.0005], [far, vp.lng + 0.0005]]];
+
+  assert.equal(validateRound(segments, round).ok, false, 'bez span musí spadnout');
+  assert.equal(validateRound(segments, round).error, 'bounds');
+  assert.equal(validateRound(segments, round, { span: VIEW_SIZE * SPAN }).ok, true);
 });
