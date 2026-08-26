@@ -450,33 +450,35 @@ body[data-phase='casual'] #controls { margin-top: auto; }
 }
 #attribution a { color: inherit; }
 
-/* ---------- lišta s prosbou o podporu ---------- */
-/* drží se paty panelu; složená je z ní jen řádek, rozevřená vyjede nahoru */
+/* ---------- prosba o podporu ---------- */
+/* složená je z ní jen ikona kafe v rohu okna; rozevřená nad ní vyroste kartička */
 #support {
-  position: sticky; bottom: 0; z-index: 3;
-  margin: 0 -26px -22px; padding: 0 26px 12px;
-  background: linear-gradient(180deg, transparent, var(--alu) 22%);
-  border-top: 1px solid var(--hairline);
+  position: fixed; right: 16px; bottom: 16px; z-index: 12;
+  display: grid; justify-items: end; gap: 8px;
+  width: min(280px, calc(100vw - 32px));
 }
 #support-toggle {
-  width: 100%; display: flex; align-items: center; gap: 8px;
-  background: none; border: 0; padding: 12px 0 10px; cursor: pointer;
-  color: var(--muted); font: 600 12px/1 Archivo, sans-serif;
-  letter-spacing: 0.08em; text-transform: uppercase;
+  width: 40px; height: 40px; display: grid; place-items: center;
+  border: 1px solid var(--hairline); background: var(--alu); color: var(--muted);
+  cursor: pointer;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
 }
-#support-toggle:hover { color: var(--text); }
-#support-toggle .cup { font-size: 15px; }
-#support-toggle .support-title { flex: 1; text-align: left; }
-#support-toggle .chev { font-size: 9px; transition: transform 0.3s var(--ease); }
-body[data-support='open'] #support-toggle .chev { transform: rotate(180deg); }
+#support-toggle svg { width: 20px; height: 20px; }
+#support-toggle:hover { color: var(--text); border-color: var(--muted); }
+body[data-support='open'] #support-toggle { color: var(--text); border-color: var(--muted); }
 
 /* rozevírání přes grid-template-rows, ať to jede plynule bez měření výšky */
-#support-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.3s var(--ease); }
+#support-body {
+  display: grid; grid-template-rows: 0fr; width: 100%;
+  transition: grid-template-rows 0.3s var(--ease);
+}
 #support-body > div { overflow: hidden; }
 body[data-support='open'] #support-body { grid-template-rows: 1fr; }
-#support-body p {
-  margin: 0 0 10px; font-size: 12.5px; line-height: 1.55; color: var(--muted);
+#support-body .inner {
+  padding: 14px; background: var(--alu-hi);
+  border: 1px solid var(--hairline); box-shadow: 0 20px 50px -20px #000;
 }
+#support-body p { margin: 0 0 10px; font-size: 12.5px; line-height: 1.55; color: var(--muted); }
 #support-body .btn { display: block; text-align: center; text-decoration: none; }
 
 /* ---------- mobil: panel pod mapu ---------- */
@@ -498,23 +500,15 @@ body[data-support='open'] #support-body { grid-template-rows: 1fr; }
   .transfer-text strong { font-size: clamp(16px, 4.6vw, 22px); }
   .transfer-count { font-size: clamp(22px, 6vw, 30px); }
   #controls { grid-template-columns: 1fr 1fr; margin-top: 6px; }
-  /* na mobilu panel odjíždí se stránkou, tak lišta drží spodek okna a leží i nad kartou */
-  #support {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 12;
-    margin: 0; padding: 0 18px calc(10px + env(safe-area-inset-bottom));
-    background: color-mix(in srgb, var(--alu) 96%, transparent);
-    backdrop-filter: blur(18px);
-    box-shadow: 0 -20px 40px -30px #000;
-  }
-  /* ať složená lišta ani rozevřená prosba neleží na tlačítkách karty ani na patě panelu */
-  #overlay { position: fixed; padding-bottom: 80px; }
-  body[data-support='open'] #overlay { padding-bottom: 210px; }
-  #panel { padding-bottom: 80px; }
+  #support { bottom: calc(16px + env(safe-area-inset-bottom)); }
+  /* ať ikona ani rozevřená prosba neleží na tlačítkách karty */
+  #overlay { position: fixed; padding-bottom: 72px; }
+  body[data-support='open'] #overlay { padding-bottom: 200px; }
   /* atribuce patří na konec stránky, ne jako tmavá lišta doprostřed obrazovky pod mapu */
   #attribution {
     grid-area: 3 / 1; align-self: auto; justify-self: stretch;
     transform: none;
-    background: none; padding: 0 18px 90px; /* pod lištou podpory ať zůstane čitelná */
+    background: none; padding: 0 18px 70px; /* pod ikonou podpory ať zůstane čitelná */
     text-align: center; line-height: 1.7;
   }
 }

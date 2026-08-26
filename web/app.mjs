@@ -59,6 +59,8 @@ const ICON = {
     + '<circle cx="15" cy="10" r="1.7" fill="currentColor" stroke="none"/>'
     + '<path d="M12 13v2"/><path d="M9.5 20v-2.6"/><path d="M14.5 20v-2.6"/>'),
   heart: svg('<path d="M12 20S3.5 14.5 3.5 8.9A4.9 4.9 0 0 1 12 5.6a4.9 4.9 0 0 1 8.5 3.3C20.5 14.5 12 20 12 20Z"/>'),
+  coffee: svg('<path d="M4 9h12v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V9Z"/>'
+    + '<path d="M16 10.5h1.5a2.5 2.5 0 0 1 0 5H16"/><path d="M7 2.5v2.6"/><path d="M11 2.5v2.6"/>'),
 };
 
 $('home').onclick = () => showIntro();
@@ -75,6 +77,7 @@ function nudgeSupport() {
   setSupport(true);
 }
 setSupport(false);
+$('support-toggle').append(...parseHtml(ICON.coffee));
 $('support-toggle').onclick = () => setSupport(document.body.dataset.support !== 'open');
 
 // ---------- panel ----------
