@@ -15,6 +15,19 @@ git push
 
 To je celé. Workers Builds nasadí každý push do `main`.
 
+**Ověř si, že se to opravdu nasadilo.** Push, který nikam nedojel, se nijak
+neohlásí — 26. 8. 2026 takhle produkce tiše zůstala tři commity pozadu, protože
+přejmenování workeru shodilo build trigger. Nejrychlejší kontrola je stáhnout si
+soubor, který přibyl posledním commitem; 404 znamená, že build neproběhl:
+
+```
+curl -sI https://kdejemetro.guth.workers.dev/og.jpg | head -1
+npx wrangler deployments list | tail -20   # zdroj má být Workers Builds, ne Secret Change
+```
+
+Když build nejede, nasadíš ručně přes `npx wrangler deploy` a pak se koukni na
+trigger (Settings → Builds u workeru `kdejemetro`).
+
 ## Když se mění schéma databáze
 
 Přidej soubor do `migrations/` (`0002_neco.sql`, `0003_...`) a pusť:
