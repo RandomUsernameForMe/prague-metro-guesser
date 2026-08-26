@@ -434,6 +434,37 @@ async function submitScore() {
   }
 }
 
+// jeden seznam pro oba žebříčky; nick je nedůvěryhodný → jen textContent
+function boardList(entries, me, valueOf) {
+  const ol = document.createElement('ol');
+  ol.className = 'board';
+  entries.forEach((e, i) => {
+    const li = document.createElement('li');
+    if (e.nick === me) li.className = 'me';
+    const rank = document.createElement('span');
+    rank.className = 'rank';
+    rank.textContent = `${i + 1}.`;
+    const nick = document.createElement('span');
+    nick.textContent = e.nick;
+    const value = document.createElement('span');
+    value.textContent = valueOf(e);
+    li.append(rank, nick, value);
+    ol.appendChild(li);
+  });
+  return ol;
+}
+
+// naplní box seznamem, nebo hláškou; fetch je jediný zdroj chyb
+async function fillBoard(box, url, me, valueOf, empty) {
+  try {
+    const { entries } = await (await fetch(url)).json();
+    if (!entries.length) { box.firstElementChild.textContent = empty; return; }
+    box.replaceChildren(boardList(entries, me, valueOf));
+  } catch {
+    box.firstElementChild.textContent = 'Žebříček se nepodařilo načíst.';
+  }
+}
+
 async function showLeaderboard(me) {
   showCard(`
     <p class="label">žebříček</p>
@@ -445,29 +476,51 @@ async function showLeaderboard(me) {
     $('train').onclick = startCasual;
     $('back').onclick = () => showIntro();
   });
-  const box = $('lb-list');
+  fillBoard($('lb-list'), `/api/leaderboard?week=${week}`, me,
+    e => `${e.score.toLocaleString('cs')} b.`,
+    'Tenhle týden zatím nikdo nehrál. Jsi první!');
+}
+
+async function submitRun() {
+  const nick = $('nick').value.trim();
+  $('submit-err').textContent = '';
+  $('submit').disabled = true;
   try {
-    const { entries } = await (await fetch(`/api/leaderboard?week=${week}`)).json();
-    if (!entries.length) { box.firstElementChild.textContent = 'Tenhle týden zatím nikdo nehrál. Jsi první!'; return; }
-    const ol = document.createElement('ol');
-    ol.className = 'board';
-    entries.forEach((e, i) => {
-      const li = document.createElement('li');
-      if (e.nick === me) li.className = 'me';
-      const rank = document.createElement('span');
-      rank.className = 'rank';
-      rank.textContent = `${i + 1}.`;
-      const nick = document.createElement('span');
-      nick.textContent = e.nick; // nick je nedůvěryhodný → jen textContent
-      const score = document.createElement('span');
-      score.textContent = `${e.score.toLocaleString('cs')} b.`;
-      li.append(rank, nick, score);
-      ol.appendChild(li);
+    const res = await fetch('/api/hardcore', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ nick, seed: hcSeed, rounds: hcRun }),
     });
-    box.replaceChildren(ol);
+    const data = await res.json();
+    if (!res.ok) {
+      $('submit-err').textContent = data.error === 'nick'
+        ? 'Neplatná přezdívka (3–16 znaků)'
+        : data.error === 'rate limit' ? 'Moc runů za sebou — zkus to za chvíli.' : data.error;
+      $('submit').disabled = false;
+      return;
+    }
+    localStorage.setItem('pmg-nick', nick);
+    showSurvivors(nick);
   } catch {
-    box.firstElementChild.textContent = 'Žebříček se nepodařilo načíst.';
+    $('submit-err').textContent = 'Odeslání selhalo — zkus znovu';
+    $('submit').disabled = false;
   }
+}
+
+function showSurvivors(me) {
+  showCard(`
+    <p class="label">hardcore</p>
+    <h2 class="hc-type">SURVIVORS</h2>
+    <div id="lb-list"><p>Načítám…</p></div>
+    <button class="btn btn-primary" id="again">Hrát hardcore</button>
+    <button class="link-btn" id="back">← zpět na začátek</button>
+  `, () => {
+    $('again').onclick = startHardcore;
+    $('back').onclick = () => showIntro();
+  });
+  fillBoard($('lb-list'), '/api/hardcore', me,
+    e => `${e.rounds} ${kola(e.rounds)}`,
+    'Zatím nikdo nepřežil. Buď první!');
 }
 
 // ---------- režimy ----------
