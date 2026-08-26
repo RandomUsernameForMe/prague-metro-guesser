@@ -592,10 +592,10 @@ body[data-mode='hardcore'] .progress li::after { content: none; }
 .life-note.lost { color: var(--blood); }
 .life-note.gained { color: var(--bone); }
 
-/* vstup do režimu: lebka v rohu úvodní karty, mimo řadu tabů */
+/* vstup do režimu: lebka na patě panelu, mimo řadu tabů */
 .card { position: relative; }
 .skull {
-  position: absolute; top: 10px; right: 10px; height: 38px;
+  height: 38px; align-self: flex-start; margin-top: auto; /* až na patu panelu */
   display: flex; align-items: center; gap: 6px; padding: 0 10px;
   border: 1px solid var(--hairline); background: #101315; color: #6b7075;
   font: 600 11px/1 Archivo, sans-serif; letter-spacing: 0.1em; text-transform: uppercase;
@@ -604,6 +604,8 @@ body[data-mode='hardcore'] .progress li::after { content: none; }
 }
 .skull svg { width: 22px; height: 22px; }
 .skull:hover { color: #e8e4dc; border-color: #6b7075; }
+/* přepínat režim jde jen z úvodu, rozehraná hra ho neukazuje */
+body:not([data-phase='intro']) .skull { display: none; }
 
 /* cesta ven z hardcore: srdce v duze, ať je vidět, že jinde je barevný svět */
 .skull.softcore { color: #f7f2ea; border-color: #6b7075; background: #1b1e20; }

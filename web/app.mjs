@@ -704,6 +704,16 @@ const introCta = (tab, played) => {
        <button class="btn btn-outline" id="warmup">Rozehřátí — ${ROUNDS} stanic na nečisto</button>`;
 };
 
+// tlačítko na patě panelu: do hardcore lebkou, ven duhovým srdcem
+function setModeSwitch(tab) {
+  const hc = tab === 'hardcore';
+  const btn = $('go-hc');
+  btn.className = hc ? 'skull softcore' : 'skull';
+  btn.title = btn.ariaLabel = hc ? 'Softcore mode' : 'Hardcore mode';
+  btn.replaceChildren(...parseHtml(`${hc ? ICON.heart : ICON.skull}<span>${hc ? 'softcore' : 'hardcore'}</span>`));
+  btn.onclick = () => showIntro(hc ? 'standard' : 'hardcore');
+}
+
 function showIntro(tab = introTab) {
   const switching = tab !== introTab; // přepnutí tabu nemá kartu znovu rozanimovat
   introTab = tab;
@@ -723,12 +733,8 @@ function showIntro(tab = introTab) {
   $('duel').hidden = true;
   $('home').hidden = true;
   $('confirm').disabled = true;
+  setModeSwitch(tab);
   showCard(`
-    ${tab === 'hardcore'
-      ? `<button class="skull softcore" id="go-hc" aria-label="Softcore mode"
-           title="Softcore">${ICON.heart}<span>softcore</span></button>`
-      : `<button class="skull" id="go-hc" aria-label="Hardcore mode"
-           title="Hardcore">${ICON.skull}<span>hardcore</span></button>`}
     <p class="label">pražské metro · týden ${week}</p>
     <h2>Metro Guesser${tab === 'hardcore' ? ' Hardcore' : ''}</h2>
     <div class="tabs" role="tablist" aria-label="režim hry">
@@ -742,7 +748,6 @@ function showIntro(tab = introTab) {
     <div class="cta">${introCta(tab, played)}</div>
   `, card => {
     if (switching) card.style.animation = 'none';
-    $('go-hc').onclick = () => showIntro(tab === 'hardcore' ? 'standard' : 'hardcore');
     card.querySelectorAll('.tab').forEach(t => {
       t.onclick = () => showIntro(t.dataset.tab);
       t.onkeydown = e => {
