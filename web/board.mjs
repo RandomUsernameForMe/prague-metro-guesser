@@ -1,9 +1,11 @@
 // Kreslení úseček, letecké dlaždice a odpočet. O režimu hry nic neví —
 // řízení si drží app.mjs (weekly/warmup/casual) a duel.mjs (duel).
 import { renderTiles, prefetchTiles, pxToLatLng, latLngToPx } from './tiles.mjs';
+import { VIEW_SIZE } from './shared/seed.mjs';
 
 const $ = id => document.getElementById(id);
-const stage = $('stage'), tilesEl = $('tiles'), svg = $('draw'), overlay = $('overlay'), hintEl = $('hint');
+const stage = $('stage'), mapEl = $('map'), tilesEl = $('tiles'), svg = $('draw'),
+  overlay = $('overlay'), hintEl = $('hint');
 const transferEl = $('transfer');
 const timebar = $('timebar'), clockEl = $('clock');
 const hintKey = 'pmg-hint-seen';
@@ -22,8 +24,20 @@ let extra = () => '';
 let revealed = false;   // osy odhalené = dokresleno, pruh o přestupu už nemá co říct
 
 export const sizePx = () => stage.clientWidth;
+// plátno je o SPAN větší než výřez, kreslí se v jeho px — ne v px stage
+const mapPx = () => sizePx() * ((viewport?.size ?? VIEW_SIZE) / VIEW_SIZE);
 export const count = () => segs.length;
-export const segments = () => segs.map(seg => seg.map(([x, y]) => pxToLatLng(x, y, viewport, sizePx())));
+export const segments = () => segs.map(seg => seg.map(([x, y]) => pxToLatLng(x, y, viewport, mapPx())));
+
+// rozměr, posun a úhel plátna; animate = narovnání po dohraném kole
+const STRAIGHTEN_MS = 600;
+function placeMap(rot, animate = false) {
+  const px = mapPx(), off = (sizePx() - px) / 2;
+  mapEl.style.width = mapEl.style.height = `${px}px`;
+  mapEl.style.left = mapEl.style.top = `${off}px`;
+  mapEl.style.transition = animate ? `rotate ${STRAIGHTEN_MS}ms var(--ease)` : 'none';
+  mapEl.style.rotate = `${rot}rad`;
+}
 
 const parseSvg = markup => [
   ...new DOMParser().parseFromString(
@@ -54,9 +68,11 @@ let countEl = null;
 function buildTransfer(lines) {
   countEl = null;
   transferEl.replaceChildren();
-  if (required < 2 || lines.length < 2) return paintTransfer();
-  transferEl.style.setProperty('--l1', `var(--${lines[0].toLowerCase()})`);
-  transferEl.style.setProperty('--l2', `var(--${lines[1].toLowerCase()})`);
+  if (required < 2) return paintTransfer();
+  // hardcore posílá prázdné lines — že jde o přestup, se přiznat musí, ale které linky ne
+  const tint = i => (lines[i] ? `var(--${lines[i].toLowerCase()})` : 'var(--hairline)');
+  transferEl.style.setProperty('--l1', tint(0));
+  transferEl.style.setProperty('--l2', tint(1));
 
   const badges = document.createElement('span');
   badges.className = 'transfer-badges';
@@ -68,11 +84,14 @@ function buildTransfer(lines) {
   }
   const head = document.createElement('strong');
   head.textContent = `Přestup — ${required} úsečky!`;
-  const sub = document.createElement('small');
-  sub.textContent = `jednu pro ${lines[0]}, druhou pro ${lines[1]}`;
   const text = document.createElement('span');
   text.className = 'transfer-text';
-  text.append(head, sub);
+  text.append(head);
+  if (lines.length > 1) {
+    const sub = document.createElement('small');
+    sub.textContent = `jednu pro ${lines[0]}, druhou pro ${lines[1]}`;
+    text.append(sub);
+  }
 
   countEl = document.createElement('span');
   countEl.className = 'transfer-count';
@@ -93,19 +112,25 @@ function commitSegment(a, b) {
   else segs.push([a, b]);
 }
 
+// offsetX by na pootočeném plátně lhal — matice SVG je správně při jakékoli transformaci
+const localPoint = e => {
+  const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(svg.getScreenCTM().inverse());
+  return [p.x, p.y];
+};
+
 svg.addEventListener('pointerdown', e => {
   // revealed = kolo dohráno; při prohlížení osy je overlay schovaný, ale kreslit se nesmí
   if (!overlay.hidden || revealed) return;
   hideHint(true);
   svg.setPointerCapture(e.pointerId);
-  const p = [e.offsetX, e.offsetY];
+  const p = localPoint(e);
   if (anchor) { commitSegment(anchor, p); anchor = cursor = null; }  // druhý klik dokončí úsečku
   else { anchor = p; cursor = p; pressing = true; }
   redraw();
 });
 svg.addEventListener('pointermove', e => {
   if (!anchor) return;
-  cursor = [e.offsetX, e.offsetY];
+  cursor = localPoint(e);
   redraw();
 });
 svg.addEventListener('pointerup', () => {
@@ -127,7 +152,7 @@ export function clear() {
 
 export function onSegmentsChange(cb) { onChange = cb; }
 
-// vp: {lat,lng,size} střed výřezu; req: kolik úseček kolo chce; lines: linky stanice
+// vp: {lat,lng,size,rot} střed a plátno výřezu; req: kolik úseček kolo chce; lines: linky stanice
 export function setRound(vp, req, lines = []) {
   viewport = vp;
   required = req;
@@ -135,9 +160,21 @@ export function setRound(vp, req, lines = []) {
   revealed = false;
   segs = []; anchor = cursor = null;
   lastSize = sizePx();
+  placeMap(vp.rot ?? 0);
   buildTransfer(lines);
-  renderTiles(tilesEl, vp, lastSize);
+  renderTiles(tilesEl, vp, mapPx());
   redraw();
+}
+
+// hardcore: po potvrzení se plátno i s kresbou a osami narovná na sever.
+// Souřadnice se nepřepočítávají — všechny žijí v prostoru plátna.
+// Vrací, o kolik ms se má odložit odhalení osy.
+export function straighten() {
+  revealed = true;              // během narovnání se už nesmí kreslit
+  if (!viewport?.rot) return 0;
+  placeMap(0, true);
+  viewport = { ...viewport, rot: 0 };
+  return STRAIGHTEN_MS;
 }
 
 // Otočení telefonu mění hranu stage, ale úsečky i dlaždice jsou v px té staré.
@@ -155,12 +192,13 @@ addEventListener('resize', () => {
     if (anchor) anchor = scale(anchor);
     if (cursor) cursor = scale(cursor);
     lastSize = size;
-    renderTiles(tilesEl, viewport, size);
+    placeMap(viewport.rot ?? 0);
+    renderTiles(tilesEl, viewport, mapPx());
     redraw();
   }, 150);
 });
 
-export function prefetch(vp) { prefetchTiles(vp, sizePx()); }
+export function prefetch(vp) { prefetchTiles(vp, sizePx() * ((vp.size ?? VIEW_SIZE) / VIEW_SIZE)); }
 
 // remember = hráč nápovědu opravdu viděl a už ji nikdy nechceme; bez něj se jen schová
 export function hideHint(remember = false) {
@@ -176,7 +214,7 @@ export function maybeShowHint() {
 
 // osy stanice, každá v barvě své linky; animate = najet zleva doprava
 const axesMarkup = (axes, animate) => axes.map(axis => {
-  const pts = axis.pts.map(([lat, lng]) => latLngToPx(lat, lng, viewport, sizePx()).join(',')).join(' ');
+  const pts = axis.pts.map(([lat, lng]) => latLngToPx(lat, lng, viewport, mapPx()).join(',')).join(' ');
   const reveal = animate
     ? ' stroke-dasharray="1000" stroke-dashoffset="1000" style="animation: reveal 1s forwards"'
     : ' opacity="0.5"'; // jen reference pod kreslením — nesmí přebít hráčovu úsečku
@@ -186,7 +224,7 @@ const axesMarkup = (axes, animate) => axes.map(axis => {
 
 // soupeřův tip: úsečky v lat/lng, čárkovaně a v jiné barvě než hráčova čára
 const rivalMarkup = segs => (segs ?? []).map(seg => {
-  const [[x1, y1], [x2, y2]] = seg.map(([lat, lng]) => latLngToPx(lat, lng, viewport, sizePx()));
+  const [[x1, y1], [x2, y2]] = seg.map(([lat, lng]) => latLngToPx(lat, lng, viewport, mapPx()));
   return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--rival)" stroke-width="4"
             stroke-linecap="round" stroke-dasharray="10 7" opacity="0.9"/>`;
 }).join('');

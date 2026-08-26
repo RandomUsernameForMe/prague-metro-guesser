@@ -38,8 +38,12 @@
   <div id="bg" aria-hidden="true"></div>
   <div id="app">
     <main id="stage">
-      <div id="tiles"></div>
-      <svg id="draw"></svg>
+      <!-- #tiles a #draw rotují jako jeden kus (hardcore), proto ten wrapper:
+           hráč pak kreslí rovnou v souřadnicích plátna a převod px↔latlng se nemění -->
+      <div id="map">
+        <div id="tiles"></div>
+        <svg id="draw"></svg>
+      </div>
       <div id="timebar" hidden><span></span></div>
       <div id="transfer" hidden></div>
       <p id="hint" hidden></p>
@@ -75,7 +79,7 @@
 
       <div class="stats">
         <div class="score">
-          <span class="label">skóre</span>
+          <span class="label" id="score-label">skóre</span>
           <strong id="score-value">0</strong>
         </div>
         <div class="clock" id="clock" hidden>
