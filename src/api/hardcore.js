@@ -11,10 +11,16 @@ const json = (obj, status = 200) =>
 const NICK_RE = /^[\p{L}\p{N} _-]{3,16}$/u;
 const SPAN_M = VIEW_SIZE * SPAN; // hardcore rotuje, tahy sahají až do rohů plátna
 
-export async function onRequestGet({ env }) {
+// Dvacítka nejlepších plus řádek hráče ?nick=, i když je až někde dole; pořadí počítá SQL.
+export async function onRequestGet({ request, env }) {
+  const nick = new URL(request.url).searchParams.get('nick') ?? '';
   const { results } = await env.DB.prepare(
-    'SELECT nick, rounds FROM hardcore ORDER BY rounds DESC, created_at ASC LIMIT 100'
-  ).all();
+    `SELECT nick, rounds, pos FROM (
+       SELECT nick, rounds, ROW_NUMBER() OVER (ORDER BY rounds DESC, created_at ASC) AS pos
+       FROM hardcore
+     ) WHERE pos <= 20 OR nick = ?
+     ORDER BY pos`
+  ).bind(nick).all();
   return json({ entries: results });
 }
 
