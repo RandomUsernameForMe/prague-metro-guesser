@@ -435,16 +435,16 @@ async function submitScore() {
     });
     const data = await res.json();
     if (!res.ok) {
-      $('submit-err').textContent = res.status === 409
-        ? 'Tuhle přezdívku už tenhle týden někdo použil — zvol jinou.'
-        : data.error === 'nick' ? NICK_HELP
-          : data.error === 'rate limit' ? 'Moc zápisů za sebou — zkus to za chvíli.'
-            : `Zápis se nepovedl (${data.error}) — zkus to znovu.`;
+      $('submit-err').textContent = data.error === 'nick' ? NICK_HELP
+        : data.error === 'rate limit' ? 'Moc zápisů za sebou — zkus to za chvíli.'
+          : `Zápis se nepovedl (${data.error}) — zkus to znovu.`;
       $('submit').disabled = false;
       return;
     }
-    localStorage.setItem(playedKey, nick);
-    showLeaderboard(nick);
+    // pod obsazenou přezdívkou zapisuje server jako „Maty (2)" — v žebříčku se
+    // musí zvýraznit ten řádek, ne ten cizí
+    localStorage.setItem(playedKey, data.nick);
+    showLeaderboard(data.nick);
   } catch {
     $('submit-err').textContent = 'Odeslání selhalo — zkus znovu';
     $('submit').disabled = false;
@@ -455,12 +455,12 @@ async function submitScore() {
 function boardList(entries, me, valueOf) {
   const ol = document.createElement('ol');
   ol.className = 'board';
-  entries.forEach((e, i) => {
+  entries.forEach(e => {
     const li = document.createElement('li');
     if (e.nick === me) li.className = 'me';
     const rank = document.createElement('span');
     rank.className = 'rank';
-    rank.textContent = `${i + 1}.`;
+    rank.textContent = `${e.pos}.`;   // pořadí ze serveru — po dvacítce může být díra
     const nick = document.createElement('span');
     nick.textContent = e.nick;
     const value = document.createElement('span');
@@ -493,7 +493,7 @@ async function showLeaderboard(me) {
     $('train').onclick = startCasual;
     $('back').onclick = () => showIntro();
   });
-  fillBoard($('lb-list'), `/api/leaderboard?week=${week}`, me,
+  fillBoard($('lb-list'), `/api/leaderboard?week=${week}${me ? `&nick=${encodeURIComponent(me)}` : ''}`, me,
     e => `${e.score.toLocaleString('cs')} b.`,
     'Tenhle týden zatím nikdo nehrál. Jsi první!');
 }
@@ -535,7 +535,7 @@ function showSurvivors(me) {
     $('again').onclick = startHardcore;
     $('back').onclick = () => showIntro();
   });
-  fillBoard($('lb-list'), '/api/hardcore', me,
+  fillBoard($('lb-list'), `/api/hardcore${me ? `?nick=${encodeURIComponent(me)}` : ''}`, me,
     e => `${e.rounds} ${kola(e.rounds)}`,
     'Zatím nikdo nepřežil. Buď první!');
 }
@@ -738,7 +738,7 @@ function showIntro(tab = introTab) {
     });
     if (tab === 'hardcore') {
       $('hc-play').onclick = startHardcore;
-      $('hc-lb').onclick = () => showSurvivors();
+      $('hc-lb').onclick = () => showSurvivors(localStorage.getItem('pmg-nick') ?? undefined);
     } else if (tab === 'casual') $('casual').onclick = startCasual;
     else if (tab === 'duel') {
       $('duel-find').onclick = () => askNick(findOpponent);

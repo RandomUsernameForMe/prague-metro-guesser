@@ -7,6 +7,8 @@ import { ipHash } from '../hash.js';
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json' } });
 
+const MAX_SAME_NICK = 20; // pojistka proti nekonečnému hledání volného čísla
+
 // Odmítnutý zápis je jinak neviditelný — hráč hlásí „nepropsalo se" a v DB není nic.
 // Log jde do Workers Logs (observability v wrangler.toml), vidět i v `wrangler tail`.
 const reject = (error, ctx, status = 400) => {
@@ -31,13 +33,20 @@ export async function onRequestPost({ request, env }) {
   const score = rounds.reduce(
     (sum, r, i) => sum + (body.lines[i] === null ? 0 : scoreRound(body.lines[i], r.station).score), 0);
 
-  try {
-    await env.DB.prepare(
-      'INSERT INTO scores (week, nick, score, lines_json, ip_hash) VALUES (?, ?, ?, ?, ?)'
-    ).bind(week, body.nick, score, JSON.stringify(body.lines), ip).run();
-  } catch (e) {
-    if (String(e).includes('UNIQUE')) return reject('nick už tento týden hrál', { nick: body.nick }, 409);
-    throw e;
+  // Obsazená přezdívka není chyba: druhý zápis dostane pořadové číslo, takže na
+  // žebříčku zůstanou oba — "Maty", "Maty (2)", "Maty (3)". O volné jméno se pere
+  // UNIQUE(week, nick), ne předchozí SELECT, takže dva souběžné zápisy nesplynou.
+  const insert = env.DB.prepare(
+    'INSERT INTO scores (week, nick, score, lines_json, ip_hash) VALUES (?, ?, ?, ?, ?)'
+  );
+  for (let n = 1; n <= MAX_SAME_NICK; n++) {
+    const nick = n === 1 ? body.nick : `${body.nick} (${n})`;
+    try {
+      await insert.bind(week, nick, score, JSON.stringify(body.lines), ip).run();
+      return json({ score, week, nick });
+    } catch (e) {
+      if (!String(e).includes('UNIQUE')) throw e;
+    }
   }
-  return json({ score, week });
+  return reject('nick už tento týden hrál', { nick: body.nick }, 409);
 }
