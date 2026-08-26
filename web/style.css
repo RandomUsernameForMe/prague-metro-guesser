@@ -361,6 +361,44 @@ body[data-phase='casual'] #controls { margin-top: auto; }
 .card ol.board .rank { color: var(--muted); }
 .error { color: #ff6b6b; font-size: 14px; min-height: 1em; }
 
+/* ---------- přestup: dvě úsečky, nahlas ---------- */
+#transfer {
+  position: absolute; top: 5px; left: 0; right: 0; z-index: 7;
+  /* badge a počítadlo mají vlastní sloupec, ustupuje jen text uprostřed */
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center; gap: 16px;
+  padding: 14px 18px;
+  /* nádech obou linek, ale dost tmavý na to, aby text zůstal čitelný i pod žlutou B */
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--l1) 30%, rgba(9, 11, 12, 0.95)),
+    color-mix(in srgb, var(--l2) 30%, rgba(9, 11, 12, 0.95)));
+  /* spodní hrana napůl v barvě jedné a napůl druhé linky */
+  border: 0 solid; border-bottom-width: 6px;
+  border-image: linear-gradient(90deg, var(--l1) 0 50%, var(--l2) 50% 100%) 1;
+  pointer-events: none;
+  animation: transfer-in 0.5s var(--ease);
+}
+#transfer[hidden] { display: none; }
+.transfer-badges { display: flex; gap: 6px; }
+.transfer-badges .badge { width: 34px; height: 34px; font-size: 20px; }
+.transfer-text { display: grid; gap: 2px; min-width: 0; }
+/* velikost podle šířky mapy — na úzkém telefonu se nadpis nesmí zalomit */
+.transfer-text strong {
+  font: 400 clamp(17px, 2.1vw, 25px)/1.15 Anton, sans-serif;
+  letter-spacing: 0.02em; text-transform: uppercase;
+}
+.transfer-text small { font-size: clamp(11px, 1.1vw, 13px); color: var(--muted); }
+.transfer-count {
+  justify-self: end;
+  font: 400 clamp(24px, 2.8vw, 34px)/1.1 Anton, sans-serif; font-variant-numeric: tabular-nums;
+  color: var(--draw);
+  animation: pulse 1.4s steps(2, end) infinite;
+}
+/* obě úsečky hotové — pruh ustoupí do pozadí, ale zůstane jako potvrzení */
+#transfer.full { opacity: 0.5; }
+#transfer.full .transfer-count { color: var(--a); animation: none; }
+@keyframes transfer-in { from { transform: translateY(-100%); } }
+
 /* ---------- hint přes mapu ---------- */
 #hint {
   position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%);
@@ -398,6 +436,10 @@ body[data-phase='casual'] #controls { margin-top: auto; }
   .brand { display: none; }
   .score { margin-top: 4px; }
   #station-name { font-size: 30px; }
+  #transfer { gap: 10px; padding: 10px 12px; border-bottom-width: 5px; }
+  .transfer-badges .badge { width: 28px; height: 28px; font-size: 17px; }
+  .transfer-text strong { font-size: clamp(16px, 4.6vw, 22px); }
+  .transfer-count { font-size: clamp(22px, 6vw, 30px); }
   #controls { grid-template-columns: 1fr 1fr; margin-top: 6px; }
   #overlay { position: fixed; }
   /* atribuce patří na konec stránky, ne jako tmavá lišta doprostřed obrazovky pod mapu */

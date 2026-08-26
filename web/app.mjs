@@ -125,7 +125,7 @@ function startRound() {
   roundStartedAt = performance.now();
   reportDraw = null;              // hlášení nikdy nepřežije do dalšího kola
   $('confirm').textContent = 'Potvrdit';
-  board.setRound(vp(), required());
+  board.setRound(vp(), required(), rounds[roundIdx].station.lines);
   paintPanel();
   overlay.hidden = true;
   $('clear').disabled = false;

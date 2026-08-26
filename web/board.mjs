@@ -4,6 +4,7 @@ import { renderTiles, prefetchTiles, pxToLatLng, latLngToPx } from './tiles.mjs'
 
 const $ = id => document.getElementById(id);
 const stage = $('stage'), tilesEl = $('tiles'), svg = $('draw'), overlay = $('overlay'), hintEl = $('hint');
+const transferEl = $('transfer');
 const timebar = $('timebar'), clockEl = $('clock');
 const hintKey = 'pmg-hint-seen';
 
@@ -18,6 +19,7 @@ let lastSize = 0;       // hrana stage při posledním překreslení — podle n
 // co se kreslí pod hráčovy úsečky (osy, tip soupeře). Funkce, ne hotový string:
 // souřadnice jsou v px, takže se po změně velikosti okna musí spočítat znovu.
 let extra = () => '';
+let revealed = false;   // osy odhalené = dokresleno, pruh o přestupu už nemá co říct
 
 export const sizePx = () => stage.clientWidth;
 export const count = () => segs.length;
@@ -39,7 +41,51 @@ export function redraw() {
     + (anchor && cursor ? segMarkup([anchor, cursor], true) : '')
     + extra();
   svg.replaceChildren(...parseSvg(markup));
+  paintTransfer();
   onChange?.(segs.length, required);
+}
+
+// ---------- přestup: dvě úsečky ----------
+// Na přestupu chce kolo jednu úsečku na každou linku. Popisek v panelu to
+// hráči neřekl dost nahlas — půlka jich nakreslila jednu čáru a potvrdila.
+// Pruh proto sedí přes snímek a drží se, dokud nejsou obě.
+let countEl = null;
+
+function buildTransfer(lines) {
+  countEl = null;
+  transferEl.replaceChildren();
+  if (required < 2 || lines.length < 2) return paintTransfer();
+  transferEl.style.setProperty('--l1', `var(--${lines[0].toLowerCase()})`);
+  transferEl.style.setProperty('--l2', `var(--${lines[1].toLowerCase()})`);
+
+  const badges = document.createElement('span');
+  badges.className = 'transfer-badges';
+  for (const l of lines) {
+    const b = document.createElement('span');
+    b.className = `badge ${l}`;
+    b.textContent = l;
+    badges.append(b);
+  }
+  const head = document.createElement('strong');
+  head.textContent = `Přestup — ${required} úsečky!`;
+  const sub = document.createElement('small');
+  sub.textContent = `jednu pro ${lines[0]}, druhou pro ${lines[1]}`;
+  const text = document.createElement('span');
+  text.className = 'transfer-text';
+  text.append(head, sub);
+
+  countEl = document.createElement('span');
+  countEl.className = 'transfer-count';
+  transferEl.replaceChildren(badges, text, countEl);
+  paintTransfer();
+}
+
+function paintTransfer() {
+  transferEl.hidden = !countEl || revealed;
+  if (transferEl.hidden) return;
+  const done = Math.min(segs.length, required);
+  countEl.textContent = `${done}/${required}`;
+  transferEl.classList.toggle('full', done >= required);
 }
 
 function commitSegment(a, b) {
@@ -80,13 +126,15 @@ export function clear() {
 
 export function onSegmentsChange(cb) { onChange = cb; }
 
-// vp: {lat,lng,size} střed výřezu; req: kolik úseček kolo chce
-export function setRound(vp, req) {
+// vp: {lat,lng,size} střed výřezu; req: kolik úseček kolo chce; lines: linky stanice
+export function setRound(vp, req, lines = []) {
   viewport = vp;
   required = req;
   extra = () => '';
+  revealed = false;
   segs = []; anchor = cursor = null;
   lastSize = sizePx();
+  buildTransfer(lines);
   renderTiles(tilesEl, vp, lastSize);
   redraw();
 }
@@ -144,6 +192,7 @@ const rivalMarkup = segs => (segs ?? []).map(seg => {
 
 // dokreslí skutečné osy po potvrzení kola, případně i tip soupeře
 export function revealAxes(axes, rival) {
+  revealed = true;
   extra = () => rivalMarkup(rival) + axesMarkup(axes, true)
     + `<style>@keyframes reveal { to { stroke-dashoffset: 0; } }</style>`;
   redraw();
@@ -151,6 +200,7 @@ export function revealAxes(axes, rival) {
 
 // osy zůstanou pod dalším kreslením jako předloha (hráč opravuje chybnou stanici)
 export function keepAxes(axes) {
+  revealed = false;              // hráč zase kreslí, pruh o přestupu se vrací
   extra = axes ? () => axesMarkup(axes, false) : () => '';
   redraw();
 }

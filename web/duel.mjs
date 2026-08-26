@@ -204,7 +204,7 @@ function onRound(msg) {
   }));
   $('duel-flag').className = 'duel-flag waiting';
   $('clear').disabled = false;
-  board.setRound(msg.viewport, msg.lines.length);
+  board.setRound(msg.viewport, msg.lines.length, msg.lines);
   board.maybeShowHint();
   board.timerStart(msg.msLeft, submit); // vypršení = odevzdej, co je nakresleno
 }
