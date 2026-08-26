@@ -177,6 +177,14 @@ function startRound() {
 
 $('confirm').onclick = () => (reportDraw ? finishReportDraw() : finishRound(false));
 
+// poznámka o životě na výsledkové kartě; Nosifer umí jen ASCII, proto ta znaménka zvlášť
+const LIFE_NOTE = {
+  lost: '<p class="life-note lost"><span class="hc-type">-1</span>život</p>',
+  gained: '<p class="life-note gained"><span class="hc-type">+1</span>život</p>',
+  held: '<p class="life-note">držíš se</p>',
+};
+let lifeNote = '';
+
 // timedOut: vypršel čas — co je nakresleno se počítá, neúplné kolo propadá za 0
 function finishRound(timedOut) {
   board.timerStop();
@@ -187,13 +195,23 @@ function finishRound(timedOut) {
   const { d, score, perLine } = scoreRound(segments, station);
   logGuess({ station, segments, timedOut, forfeited: false });
   if (mode === 'weekly') { lines.push(segments); }
-  if (mode !== 'casual') { totalScore += score; setScore(totalScore); }
+  if (mode === 'hardcore') { hcRun.push(segments); takeLife(d); }
+  if (mode !== 'casual' && mode !== 'hardcore') { totalScore += score; setScore(totalScore); }
   board.hideHint(true);
-  board.revealAxes(station.axes);
+  const wait = reveal(station);
   const detail = perLine.length > 1
     ? perLine.map(r => `linka ${r.line}: ${Math.round(r.d)} m`).join(' · ')
     : `odchylka ${Math.round(d)} m od skutečné osy`;
-  showResultCard(station, `+${score}`, timedOut ? `čas vypršel · ${detail}` : detail, segments);
+  const big = mode === 'hardcore' ? `${Math.round(d)} m` : `+${score}`;
+  showResultCard(wait, station, big, timedOut ? `čas vypršel · ${detail}` : detail, segments);
+}
+
+// d = průměrná odchylka, null = propadlé kolo; přepočítá životy a text na kartě
+function takeLife(d) {
+  const before = lives;
+  lives = nextLives(lives, d);
+  lostThisRound = lives < before;
+  lifeNote = LIFE_NOTE[lives < before ? 'lost' : lives > before ? 'gained' : 'held'];
 }
 
 // vypršel čas a chybí úsečka → 0 bodů, ale osu ukaž (hráč se má co naučit)
@@ -201,31 +219,41 @@ function forfeitRound(station, segments) {
   // i rozkreslené úsečky jsou data — hráč začal a nestihl
   logGuess({ station, segments, timedOut: true, forfeited: true });
   if (mode === 'weekly') lines.push(null);
+  if (mode === 'hardcore') { hcRun.push(null); takeLife(null); }
   board.hideHint(true);
   board.clear();
-  board.revealAxes(station.axes);
-  showResultCard(station, '0', required() > 1
+  const wait = reveal(station);
+  showResultCard(wait, station, mode === 'hardcore' ? '—' : '0', required() > 1
     ? 'Čas vypršel — u přestupní stanice musíš stihnout obě úsečky.'
     : 'Čas vypršel — nestihl jsi nakreslit úsečku.', null);
 }
 
+// hardcore: nejdřív se plátno narovná na sever, teprve pak najede osa
+function reveal(station) {
+  const wait = board.straighten();
+  setTimeout(() => board.revealAxes(station.axes), wait);
+  return wait;
+}
+
 // reveal osy ještě chvíli běží — kartu ukaž až po něm
-const showResultCard = (...args) => setTimeout(() => renderResult(...args), 1200);
+const showResultCard = (wait, ...args) => setTimeout(() => renderResult(...args), 1200 + wait);
 
 function renderResult(station, big, detail, segments) {
   const where = mode === 'weekly' ? `kolo ${roundIdx + 1} z ${rounds.length}`
-    : mode === 'warmup' ? `rozehřátí ${roundIdx + 1} z ${rounds.length}` : 'casual';
+    : mode === 'warmup' ? `rozehřátí ${roundIdx + 1} z ${rounds.length}`
+      : mode === 'hardcore' ? `hardcore · kolo ${roundIdx + 1}` : 'casual';
   showCard(`
     <p class="label">${where}</p>
     <h2></h2>
     <div class="big">${big}</div>
+    ${mode === 'hardcore' ? lifeNote : ''}
     <p>${detail}</p>
     <button class="btn btn-primary" id="next">${nextLabel()}</button>
     <button class="btn btn-outline" id="report">${ICON.warn}Stanice je zadaná špatně</button>
     <button class="link-btn" id="peek">prohlédnout mapu →</button>
     ${mode === 'casual' ? '<button class="link-btn" id="back">← zpět na začátek</button>' : ''}
   `, card => {
-    card.querySelector('h2').textContent = station.name;
+    card.querySelector('h2').textContent = station.name; // po odpovědi už není co tajit
     $('next').onclick = advance;
     if (mode === 'casual') $('back').onclick = () => showIntro();
     $('report').onclick = () => showReportCard({ station, big, detail, segments });
@@ -324,11 +352,19 @@ async function sendReport(ctx) {
 
 const nextLabel = () =>
   mode === 'casual' ? 'Další stanice'
-    : roundIdx + 1 < rounds.length ? 'Další kolo'
-      : mode === 'warmup' ? 'Vyhodnocení rozehřátí' : 'Vyhodnocení';
+    : mode === 'hardcore' ? (lives <= 0 ? 'Konec runu' : 'Další kolo')
+      : roundIdx + 1 < rounds.length ? 'Další kolo'
+        : mode === 'warmup' ? 'Vyhodnocení rozehřátí' : 'Vyhodnocení';
 
 function advance() {
   if (mode === 'casual') { rounds = [randomRound()]; roundIdx = 0; startRound(); return; }
+  if (mode === 'hardcore') {
+    // MAX_ROUNDS je strop payloadu při odeslání runu, ne herní pravidlo
+    if (lives <= 0 || rounds.length >= MAX_ROUNDS) return endRun();
+    rounds.push(hardcoreRound(hcSeed, ++roundIdx, stations));
+    startRound();
+    return;
+  }
   roundIdx++;
   roundIdx < rounds.length ? startRound() : (mode === 'warmup' ? finishWarmup() : finish());
 }
@@ -472,6 +508,30 @@ function startHardcore() {
   roundIdx = 0; totalScore = 0;
   rounds = [hardcoreRound(hcSeed, 0, stations)];
   startRound();
+}
+
+const kola = n => (n === 1 ? 'kolo' : n < 5 ? 'kola' : 'kol');
+
+function endRun() {
+  const played = rounds.length;   // fatální kolo se počítá
+  const best = Math.max(Number(localStorage.getItem(hcBestKey) || 0), played);
+  localStorage.setItem(hcBestKey, String(best));
+  showCard(`
+    <p class="label">hardcore · konec</p>
+    <h2 class="hc-type">KONEC</h2>
+    <div class="big hc-type">${played}</div>
+    <p>Přežil jsi ${played} ${kola(played)}. Tvůj rekord je ${best}.</p>
+    <input id="nick" maxlength="16" placeholder="přezdívka (3–16 znaků)">
+    <p class="error" id="submit-err"></p>
+    <button class="btn btn-primary" id="submit">Zapsat mezi přeživší</button>
+    <button class="btn btn-outline" id="again">Hrát znovu</button>
+    <button class="link-btn" id="back">← zpět na začátek</button>
+  `, () => {
+    $('nick').value = localStorage.getItem('pmg-nick') ?? '';
+    $('submit').onclick = submitRun;
+    $('again').onclick = startHardcore;
+    $('back').onclick = () => showIntro();
+  });
 }
 
 // ---------- helpers ----------
