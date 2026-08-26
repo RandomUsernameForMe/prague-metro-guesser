@@ -97,20 +97,22 @@
       </div>
 
       <button id="home" class="link-btn" hidden>← zpět na začátek</button>
-      <!-- přepínač hardcore/softcore; obsah dopisuje showIntro, mimo úvod se schová -->
-      <button id="go-hc" class="skull"></button>
+
+      <!-- pata panelu: přepínač hardcore/softcore (obsah dopisuje showIntro, mimo úvod se schová)
+           a vedle něj prosba o podporu — na desktopu v řadě, na mobilu kafe pluje v rohu okna -->
+      <div id="panel-foot">
+        <button id="go-hc" class="skull"></button>
+        <div id="support">
+          <div id="support-body"><div><div class="inner">
+            <p>Tato hříčka je zdarma, ale stála mě nějaký čas. Jestli vám udělala radost,
+              můžete přispět — zvyšuje to šanci, že někdy nějakou zase stvořím.</p>
+            <a class="btn btn-outline" href="https://buymeacoffee.com/guth" target="_blank" rel="noopener">Koupit mi kafe</a>
+          </div></div></div>
+          <button id="support-toggle" aria-expanded="false" aria-controls="support-body" aria-label="Podpořit autora" title="Podpořit autora"></button>
+        </div>
+      </div>
 
     </aside>
-
-    <!-- prosba o podporu: složená je z ní jen ikona kafe v rohu okna, po dohraném kole se vysune sama -->
-    <div id="support">
-      <div id="support-body"><div><div class="inner">
-        <p>Tato hříčka je zdarma, ale stála mě nějaký čas. Jestli vám udělala radost,
-          můžete přispět — zvyšuje to šanci, že někdy nějakou zase stvořím.</p>
-        <a class="btn btn-outline" href="https://buymeacoffee.com/guth" target="_blank" rel="noopener">Koupit mi kafe</a>
-      </div></div></div>
-      <button id="support-toggle" aria-expanded="false" aria-controls="support-body" aria-label="Podpořit autora" title="Podpořit autora"></button>
-    </div>
 
     <footer id="attribution">ortofoto © ČÚZK · data © OpenStreetMap · <a id="photo-credit" target="_blank" rel="noopener"></a></footer>
   </div>

@@ -451,12 +451,12 @@ body[data-phase='casual'] #controls { margin-top: auto; }
 #attribution a { color: inherit; }
 
 /* ---------- prosba o podporu ---------- */
-/* složená je z ní jen ikona kafe v rohu okna; rozevřená nad ní vyroste kartička */
-#support {
-  position: fixed; right: 16px; bottom: 16px; z-index: 12;
-  display: grid; justify-items: end; gap: 8px;
-  width: min(280px, calc(100vw - 32px));
+/* složená je z ní jen ikona kafe vedle přepínače režimu; rozevřená nad ní vyroste kartička */
+#panel-foot {
+  position: relative; margin-top: auto; /* až na patu panelu */
+  display: flex; align-items: center; gap: 10px;
 }
+#support { z-index: 12; }
 #support-toggle {
   width: 40px; height: 40px; display: grid; place-items: center;
   border: 1px solid var(--hairline); background: var(--alu); color: var(--muted);
@@ -467,9 +467,11 @@ body[data-phase='casual'] #controls { margin-top: auto; }
 #support-toggle:hover { color: var(--text); border-color: var(--muted); }
 body[data-support='open'] #support-toggle { color: var(--text); border-color: var(--muted); }
 
-/* rozevírání přes grid-template-rows, ať to jede plynule bez měření výšky */
+/* rozevírání přes grid-template-rows, ať to jede plynule bez měření výšky;
+   kartička visí nad ikonou, ať nehýbe s obsahem panelu */
 #support-body {
-  display: grid; grid-template-rows: 0fr; width: 100%;
+  position: absolute; left: 0; right: 0; bottom: calc(100% + 8px);
+  display: grid; grid-template-rows: 0fr;
   transition: grid-template-rows 0.3s var(--ease);
 }
 #support-body > div { overflow: hidden; }
@@ -500,7 +502,14 @@ body[data-support='open'] #support-body { grid-template-rows: 1fr; }
   .transfer-text strong { font-size: clamp(16px, 4.6vw, 22px); }
   .transfer-count { font-size: clamp(22px, 6vw, 30px); }
   #controls { grid-template-columns: 1fr 1fr; margin-top: 6px; }
-  #support { bottom: calc(16px + env(safe-area-inset-bottom)); }
+  /* panel je tu v toku stránky, kafe patří do rohu okna — backdrop-filter by mu ukotvil
+     position: fixed na panel místo na viewport, a na mobilu stejně nemá co rozmazávat */
+  #panel { backdrop-filter: none; }
+  #support {
+    position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom));
+    width: min(280px, calc(100vw - 32px));
+    display: grid; justify-items: end;
+  }
   /* ať ikona ani rozevřená prosba neleží na tlačítkách karty */
   #overlay { position: fixed; padding-bottom: 72px; }
   body[data-support='open'] #overlay { padding-bottom: 200px; }
@@ -629,7 +638,7 @@ body[data-mode='hardcore'] .progress li::after { content: none; }
 /* vstup do režimu: lebka na patě panelu, mimo řadu tabů */
 .card { position: relative; }
 .skull {
-  height: 38px; align-self: flex-start; margin-top: auto; /* až na patu panelu */
+  height: 38px;
   display: flex; align-items: center; gap: 6px; padding: 0 10px;
   border: 1px solid var(--hairline); background: #101315; color: #6b7075;
   font: 600 11px/1 Archivo, sans-serif; letter-spacing: 0.1em; text-transform: uppercase;
