@@ -7,18 +7,25 @@ import { ipHash } from '../hash.js';
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json' } });
 
+// Odmítnutý zápis je jinak neviditelný — hráč hlásí „nepropsalo se" a v DB není nic.
+// Log jde do Workers Logs (observability v wrangler.toml), vidět i v `wrangler tail`.
+const reject = (error, ctx, status = 400) => {
+  console.error('score reject', JSON.stringify({ error, ...ctx }));
+  return json({ error }, status);
+};
+
 export async function onRequestPost({ request, env }) {
   const body = await request.json().catch(() => null);
   const week = isoWeek(new Date());
   const rounds = weeklyChallenge(week, stations);
   const v = validateSubmission(body, rounds, week);
-  if (!v.ok) return json({ error: v.error }, 400);
+  if (!v.ok) return reject(v.error, { nick: body?.nick, week: body?.week, server_week: week });
 
   const ip = await ipHash(request.headers.get('cf-connecting-ip'), env);
   const { cnt } = await env.DB.prepare(
     "SELECT COUNT(*) AS cnt FROM scores WHERE ip_hash = ? AND created_at > datetime('now','-1 hour')"
   ).bind(ip).first();
-  if (cnt >= 10) return json({ error: 'rate limit' }, 429);
+  if (cnt >= 10) return reject('rate limit', { nick: body.nick, cnt }, 429);
 
   // skóre počítá server — číslo od klienta se ignoruje; null = propadlé kolo
   const score = rounds.reduce(
@@ -29,7 +36,7 @@ export async function onRequestPost({ request, env }) {
       'INSERT INTO scores (week, nick, score, lines_json, ip_hash) VALUES (?, ?, ?, ?, ?)'
     ).bind(week, body.nick, score, JSON.stringify(body.lines), ip).run();
   } catch (e) {
-    if (String(e).includes('UNIQUE')) return json({ error: 'nick už tento týden hrál' }, 409);
+    if (String(e).includes('UNIQUE')) return reject('nick už tento týden hrál', { nick: body.nick }, 409);
     throw e;
   }
   return json({ score, week });

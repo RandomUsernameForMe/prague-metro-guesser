@@ -6,6 +6,11 @@ compatibility_date = "2026-08-01"
 [assets]
 directory = "./web"
 
+# console.* z workeru se drží pár dní a dá se prohledat v dashboardu; bez toho je
+# vidět jen to, co zrovna teče přes `wrangler tail`
+[observability]
+enabled = true
+
 [[d1_databases]]
 binding = "DB"
 database_name = "metro-guesser"
