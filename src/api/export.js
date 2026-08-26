@@ -1,11 +1,10 @@
-import stations from '../../web/stations.json';
+import { loadStations } from '../stations.js';
 import { csvRow } from '../../web/shared/csv.mjs';
 
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json' } });
 
 const MAX_LIMIT = 50000;
-const byId = new Map(stations.map(s => [s.id, s]));
 
 const COLUMNS = ['id', 'created_at', 'session', 'mode', 'week', 'station_id', 'station_name',
   'station_lines', 'round_idx', 'u', 'v', 'dist_m', 'score', 'ms', 'timed_out', 'forfeited',
@@ -26,6 +25,7 @@ export async function onRequestGet({ request, env }) {
     'SELECT * FROM guesses WHERE id > ? ORDER BY id LIMIT ?'
   ).bind(after, Math.min(limit, MAX_LIMIT)).all();
 
+  const byId = new Map((await loadStations(env)).map(s => [s.id, s]));
   const body = [csvRow(COLUMNS), ...results.map(r => {
     const st = byId.get(r.station_id);
     return csvRow([r.id, r.created_at, r.session, r.mode, r.week, r.station_id,

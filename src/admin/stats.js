@@ -1,7 +1,5 @@
-import stations from '../../web/stations.json';
+import { loadStations } from '../stations.js';
 import { page, html, esc, int, fix1, pct, secs, den } from './layout.js';
-
-const byId = new Map(stations.map(s => [s.id, s]));
 
 const empty = text => `<p><i>${text}</i></p>`;
 
@@ -18,7 +16,7 @@ ${rows.map(r => `<tr>
 </table>`;
 }
 
-function stationTable(rows) {
+function stationTable(rows, byId) {
   if (!rows.length) return empty('Zatím nikdo nic nezkusil.');
   // nejtěžší první; stanice bez skóre (samé propadlé kolo) patří na začátek
   const sorted = [...rows].sort((a, b) => (a.avg_score ?? -1) - (b.avg_score ?? -1));
@@ -45,6 +43,7 @@ ${sorted.map(r => {
 }
 
 export async function onRequestGet({ env }) {
+  const byId = new Map((await loadStations(env)).map(s => [s.id, s]));
   const [daily, perStation] = await env.DB.batch([
     env.DB.prepare(
       `SELECT date(created_at) AS den, COUNT(*) AS kol,
@@ -63,7 +62,7 @@ export async function onRequestGet({ env }) {
 <h2>Posledních 14 dní</h2>
 ${dailyTable(daily.results)}
 <h2>Stanice <small>(nejtěžší první, za celou dobu)</small></h2>
-${stationTable(perStation.results)}`;
+${stationTable(perStation.results, byId)}`;
 
   return html(page('Statistiky', '/admin/stats', body));
 }

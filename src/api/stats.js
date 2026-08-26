@@ -1,4 +1,4 @@
-import stations from '../../web/stations.json';
+import { loadStations } from '../stations.js';
 
 const json = (obj, status = 200, headers = {}) =>
   new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json', ...headers } });
@@ -8,7 +8,6 @@ const json = (obj, status = 200, headers = {}) =>
 const TTL_S = 300;
 
 const MODES = new Set(['weekly', 'warmup', 'casual', 'duel']);
-const byId = new Map(stations.map(s => [s.id, s]));
 const round1 = n => (n === null ? null : Math.round(n * 10) / 10);
 
 // veřejné: agregace bez identifikátorů. Výběr týdenní výzvy tím neuniká — je
@@ -27,6 +26,7 @@ export async function onRequestGet({ request, env }) {
   );
   const { results } = await (mode ? stmt.bind(mode) : stmt).all();
 
+  const byId = new Map((await loadStations(env)).map(s => [s.id, s]));
   const entries = results.map(r => {
     const st = byId.get(r.station_id);
     return {

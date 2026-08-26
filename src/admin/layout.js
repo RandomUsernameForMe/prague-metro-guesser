@@ -45,6 +45,13 @@ const CSS = `
   .card { background: #1c1f22; border-radius: 6px; padding: 12px 18px; min-width: 130px; }
   .card b { display: block; font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .card span { color: #9aa0a6; font-size: 12px; }
+  button { font: inherit; color: inherit; background: #1c1f22; border: 1px solid #2b2f33;
+    border-radius: 4px; padding: 5px 12px; cursor: pointer; }
+  button[aria-current] { background: #e8e8e8; color: #121416; font-weight: 600; }
+  input { font: inherit; color: inherit; background: #1c1f22; border: 1px solid #2b2f33;
+    border-radius: 4px; padding: 5px 8px; }
+  code { color: #9aa0a6; }
+  .err { color: #ff8080; }
 `;
 
 export const card = (label, value) => `<div class="card"><b>${esc(value)}</b><span>${esc(label)}</span></div>`;

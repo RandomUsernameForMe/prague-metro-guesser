@@ -1,4 +1,4 @@
-import stations from '../../web/stations.json';
+import { loadStations } from '../stations.js';
 import { isoWeek, VIEW_SIZE } from '../../web/shared/seed.mjs';
 import { SPAN } from '../../web/shared/hardcore.mjs';
 import { scoreRound } from '../../web/shared/scoring.mjs';
@@ -11,7 +11,6 @@ const json = (obj, status = 200) =>
 const MODES = new Set(['weekly', 'warmup', 'casual', 'hardcore']);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HOURLY_LIMIT = 300; // casual kolo trvá 20 s → poctivý hráč se sem nedostane
-const byId = new Map(stations.map(s => [s.id, s]));
 const inUnit = n => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 1;
 
 export async function onRequestPost({ request, env }) {
@@ -24,7 +23,8 @@ export async function onRequestPost({ request, env }) {
   if (!Number.isInteger(b.ms) || b.ms < 0 || b.ms > 600000) return json({ error: 'ms' }, 400);
   if (typeof b.timedOut !== 'boolean' || typeof b.forfeited !== 'boolean') return json({ error: 'flags' }, 400);
 
-  const station = byId.get(b.stationId);
+  const stations = await loadStations(env);
+  const station = stations.find(s => s.id === b.stationId);
   if (!station) return json({ error: 'station' }, 400);
   // úsečky musí ležet uvnitř výřezu, který si klient nárokuje — jinak je přepočet skóre nesmysl
   // hardcore kreslí do pootočeného plátna, tam sahají tahy až do rohů

@@ -1,4 +1,4 @@
-import stations from '../web/stations.json';
+import { loadStations } from './stations.js';
 import { weeklyChallenge, roundViewport, isoWeek } from '../web/shared/seed.mjs';
 import { scoreRound } from '../web/shared/scoring.mjs';
 import { validateRound } from '../web/shared/validate.mjs';
@@ -25,7 +25,7 @@ export class MatchDO {
   async load(code) {
     if (this.state) return;
     // seed přes secret: z veřejného kódu zápasu si stanice nikdo dopředu nespočítá
-    this.rounds = weeklyChallenge(await duelSeed(code, this.env), stations);
+    this.rounds = weeklyChallenge(await duelSeed(code, this.env), await loadStations(this.env));
     this.seats = (await this.ctx.storage.get('seats')) ?? {};
     this.guesses = (await this.ctx.storage.get('guesses')) ?? {}; // seat → {i, lines} posledního tipu
     this.state = (await this.ctx.storage.get('state'))

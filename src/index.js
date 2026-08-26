@@ -4,11 +4,13 @@ import * as guess from './api/guess.js';
 import * as hardcore from './api/hardcore.js';
 import * as report from './api/report.js';
 import * as stats from './api/stats.js';
+import * as stationsJson from './api/stations.js';
 import * as exportCsv from './api/export.js';
 import * as adminIndex from './admin/index.js';
 import * as adminStats from './admin/stats.js';
 import * as adminReports from './admin/reports.js';
 import * as adminHeatmap from './admin/heatmap.js';
+import * as adminStation from './admin/station.js';
 import { guard } from './admin/auth.js';
 
 export { MatchDO } from './match-do.js';
@@ -23,6 +25,8 @@ const ROUTES = {
   '/api/report': { POST: report.onRequestPost },
   '/api/stats': { GET: stats.onRequestGet },
   '/api/export': { GET: exportCsv.onRequestGet },
+  // vypadá jako statický soubor, ale musí přes worker kvůli přepisům os z adminu
+  '/stations.json': { GET: stationsJson.onRequestGet },
 };
 
 // celý /admin/* je za Basic Authem; '/admin' i '/admin/' vedou na přehled
@@ -32,6 +36,7 @@ const ADMIN_ROUTES = {
   '/admin/stats': { GET: adminStats.onRequestGet },
   '/admin/reports': { GET: adminReports.onRequestGet },
   '/admin/heatmap': { GET: adminHeatmap.onRequestGet },   // ?station=<id>
+  '/admin/station': { GET: adminStation.onRequestGet, POST: adminStation.onRequestPost },  // ?id=<id>
 };
 
 const MATCH_PATH = /^\/api\/duel\/([ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6})$/;

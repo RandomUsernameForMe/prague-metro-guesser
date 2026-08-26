@@ -1,9 +1,7 @@
-import stations from '../../web/stations.json';
+import { loadStations } from '../stations.js';
 import { layout } from '../../web/tiles.mjs';
 import { page, html, esc, int, fix1, pct, card } from './layout.js';
 import { heatmapLines, axisLines } from './heatmap-geom.js';
-
-const byId = new Map(stations.map(s => [s.id, s]));
 
 const SIZE = 640;      // hrana mapy v px; výřez je stejných 600 m jako ve hře
 const DRAW = 500;      // strop na počet vykreslených kol, ať stránka nemá megabajty
@@ -40,7 +38,7 @@ function mapHtml(station, lines) {
 
 export async function onRequestGet({ request, env }) {
   const id = new URL(request.url).searchParams.get('station');
-  const station = byId.get(id);
+  const station = (await loadStations(env)).find(s => s.id === id);
   if (!station) {
     return html(page('Neznámá stanice', '/admin/stats',
       '<p>Taková stanice není. <a href="/admin/stats">Zpátky na statistiky</a>.</p>'));
@@ -68,7 +66,7 @@ export async function onRequestGet({ request, env }) {
       (outside ? `. Mimo výřez padlo ${int(outside)} úseček — do obrázku se nevešly.` : '.');
 
   const body = `
-<p><a href="/admin/stats">← statistiky</a></p>
+<p><a href="/admin/stats">← statistiky</a> · <a href="/admin/station?id=${encodeURIComponent(station.id)}">upravit osu</a></p>
 <div class="cards">
   ${card('kol', int(s.n))}
   ${card('ø skóre', s.n ? int(s.avg_score) : '—')}

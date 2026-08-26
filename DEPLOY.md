@@ -3,6 +3,10 @@
 Produkce: <https://kdejemetro.guth.workers.dev>
 Admin: `/admin` (Basic Auth, na jménu nezáleží, heslo je secret `ADMIN_PASSWORD`)
 
+Osy stanic jdou přepsat z adminu (`/admin/station?id=…`, odkaz je u každého
+hlášení). Přepis žije v D1, projeví se do minuty a bez deploye — ale až po
+migraci `0003_station_axes.sql`, bez ní se hraje podle `web/stations.json`.
+
 Adresa se skládá z `name` ve `wrangler.toml` a ze subdomény účtu (`guth`).
 Přejmenování workeru zakládá nový worker — znamená to znovu nastavit secrety
 a znovu propojit Workers Builds, tak to nedělej pro nic za nic.

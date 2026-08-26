@@ -5,6 +5,9 @@ compatibility_date = "2026-08-01"
 
 [assets]
 directory = "./web"
+# stations.json leží ve web/, ale odpovídá na něj worker: přilepuje k němu přepisy
+# os z adminu (tabulka station_axes). Bez toho by klient hrál podle jiných os než server.
+run_worker_first = ["/stations.json"]
 
 # console.* z workeru se drží pár dní a dá se prohledat v dashboardu; bez toho je
 # vidět jen to, co zrovna teče přes `wrangler tail`

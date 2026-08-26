@@ -1,4 +1,4 @@
-import stations from '../../web/stations.json';
+import { loadStations } from '../stations.js';
 import { validateReport } from '../../web/shared/validate.mjs';
 import { ipHash } from '../hash.js';
 
@@ -7,7 +7,7 @@ const json = (obj, status = 200) =>
 
 export async function onRequestPost({ request, env }) {
   const body = await request.json().catch(() => null);
-  const v = validateReport(body, stations);
+  const v = validateReport(body, await loadStations(env));
   if (!v.ok) return json({ error: v.error }, 400);
 
   const ip = await ipHash(request.headers.get('cf-connecting-ip'), env);

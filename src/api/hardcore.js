@@ -1,4 +1,4 @@
-import stations from '../../web/stations.json';
+import { loadStations } from '../stations.js';
 import { VIEW_SIZE } from '../../web/shared/seed.mjs';
 import { scoreRound } from '../../web/shared/scoring.mjs';
 import { validateRound } from '../../web/shared/validate.mjs';
@@ -36,6 +36,7 @@ export async function onRequestPost({ request, env }) {
 
   // Délku runu počítá server ze seedu a odeslaných úseček — číslo od klienta neexistuje.
   // Kola za smrtí se zahodí, i kdyby je klient poslal.
+  const stations = await loadStations(env);
   let lives = LIVES_MAX, played = 0;
   for (const segments of b.rounds) {
     const round = hardcoreRound(b.seed, played, stations);

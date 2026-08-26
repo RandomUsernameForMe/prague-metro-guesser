@@ -1,4 +1,4 @@
-import stations from '../../web/stations.json';
+import { loadStations } from '../stations.js';
 import { isoWeek, weeklyChallenge } from '../../web/shared/seed.mjs';
 import { scoreRound } from '../../web/shared/scoring.mjs';
 import { validateSubmission } from '../../web/shared/validate.mjs';
@@ -19,7 +19,7 @@ const reject = (error, ctx, status = 400) => {
 export async function onRequestPost({ request, env }) {
   const body = await request.json().catch(() => null);
   const week = isoWeek(new Date());
-  const rounds = weeklyChallenge(week, stations);
+  const rounds = weeklyChallenge(week, await loadStations(env));
   const v = validateSubmission(body, rounds, week);
   if (!v.ok) return reject(v.error, { nick: body?.nick, week: body?.week, server_week: week });
 
