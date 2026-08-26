@@ -63,6 +63,20 @@ const ICON = {
 
 $('home').onclick = () => showIntro();
 
+// ---------- lišta s prosbou o podporu ----------
+// vysune se sama po dohraném kole, ale jen jednou za návštěvu — pak už si ji hráč otevírá sám
+const setSupport = open => {
+  document.body.dataset.support = open ? 'open' : 'shut';
+  $('support-toggle').setAttribute('aria-expanded', String(open));
+};
+function nudgeSupport() {
+  if (sessionStorage.getItem('pmg-support-shown')) return;
+  sessionStorage.setItem('pmg-support-shown', '1');
+  setSupport(true);
+}
+setSupport(false);
+$('support-toggle').onclick = () => setSupport(document.body.dataset.support !== 'open');
+
 // ---------- panel ----------
 // zadání kola + kolik úseček ještě chybí
 function updateTask() {
@@ -246,7 +260,10 @@ function reveal(station) {
 }
 
 // reveal osy ještě chvíli běží — kartu ukaž až po něm
-const showResultCard = (wait, ...args) => setTimeout(() => renderResult(...args), 1200 + wait);
+const showResultCard = (wait, ...args) => setTimeout(() => {
+  renderResult(...args);
+  nudgeSupport();
+}, 1200 + wait);
 
 function renderResult(station, big, detail, segments) {
   const where = mode === 'weekly' ? `kolo ${roundIdx + 1} z ${rounds.length}`
@@ -379,12 +396,6 @@ function advance() {
   roundIdx < rounds.length ? startRound() : (mode === 'warmup' ? finishWarmup() : finish());
 }
 
-// prosba o podporu — jen na koncových kartách, ne mezi koly
-const SUPPORT = `
-  <p class="support">Tato hříčka je zdarma, ale stála mě nějaký čas. Jestli vám udělala radost,
-    <a href="https://buymeacoffee.com/guth" target="_blank" rel="noopener">můžete přispět</a> —
-    zvyšuje to šanci, že někdy nějakou zase stvořím.</p>`;
-
 // ---------- konec rozehřátí ----------
 function finishWarmup() {
   const played = localStorage.getItem(playedKey);
@@ -399,7 +410,6 @@ function finishWarmup() {
       : `<button class="btn btn-primary" id="play">Hrát týdenní výzvu na ostro</button>
          <button class="btn btn-outline" id="again">Ještě jednou na nečisto</button>`}
     <button class="link-btn" id="back">← zpět na začátek</button>
-    ${SUPPORT}
   `, () => {
     if (played) $('lb').onclick = () => showLeaderboard(played);
     else $('play').onclick = startWeekly;
@@ -501,7 +511,6 @@ async function showLeaderboard(me) {
     <div id="lb-list"><p>Načítám…</p></div>
     <button class="btn btn-outline" id="train">Casual mode</button>
     <button class="link-btn" id="back">← zpět na začátek</button>
-    ${SUPPORT}
   `, () => {
     $('train').onclick = startCasual;
     $('back').onclick = () => showIntro();
@@ -613,7 +622,6 @@ function endRun() {
     <button class="btn btn-primary" id="submit">Zapsat mezi přeživší</button>
     <button class="btn btn-outline" id="again">Hrát znovu</button>
     <button class="link-btn" id="back">← zpět na začátek</button>
-    ${SUPPORT}
   `, () => {
     $('nick').value = localStorage.getItem('pmg-nick') ?? '';
     $('submit').onclick = submitRun;
