@@ -11,8 +11,9 @@ let srcIdx = 0;
 // dlaždice pokrývající výřez + jejich pozice ve stage
 // (export kvůli scripts/build-brand.mjs, který skládá stejný výřez do OG obrázku)
 export function layout(vp, sizePx) {
-  const halfLng = (VIEW_SIZE / 2) / mPerDegLng(vp.lat);
-  const halfLat = (VIEW_SIZE / 2) / M_PER_DEG_LAT;
+  const span = vp.size ?? VIEW_SIZE;   // hardcore kreslí na větší plátno, ať rotace nekouká do rohů
+  const halfLng = (span / 2) / mPerDegLng(vp.lat);
+  const halfLat = (span / 2) / M_PER_DEG_LAT;
   const xW = lngToTileX(vp.lng - halfLng, Z) * TILE;
   const xE = lngToTileX(vp.lng + halfLng, Z) * TILE;
   const yN = latToTileY(vp.lat + halfLat, Z) * TILE;
@@ -61,13 +62,15 @@ export function prefetchTiles(vp, sizePx) {
 
 // ponytail: px↔latlng přes equirect, dlaždice přes mercator — rozdíl na 600 m < 1 px
 export function pxToLatLng(px, py, vp, sizePx) {
-  const east = (px / sizePx - 0.5) * VIEW_SIZE;
-  const north = (0.5 - py / sizePx) * VIEW_SIZE;
+  const span = vp.size ?? VIEW_SIZE;
+  const east = (px / sizePx - 0.5) * span;
+  const north = (0.5 - py / sizePx) * span;
   return [vp.lat + north / M_PER_DEG_LAT, vp.lng + east / mPerDegLng(vp.lat)];
 }
 
 export function latLngToPx(lat, lng, vp, sizePx) {
+  const span = vp.size ?? VIEW_SIZE;
   const east = (lng - vp.lng) * mPerDegLng(vp.lat);
   const north = (lat - vp.lat) * M_PER_DEG_LAT;
-  return [((east / VIEW_SIZE) + 0.5) * sizePx, (0.5 - north / VIEW_SIZE) * sizePx];
+  return [((east / span) + 0.5) * sizePx, (0.5 - north / span) * sizePx];
 }

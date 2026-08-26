@@ -4,6 +4,8 @@ import {
   nextLives, runLength, hardcoreRound, hardcoreViewport, LIVES_MAX, SPAN,
 } from '../web/shared/hardcore.mjs';
 import { roundViewport, VIEW_SIZE } from '../web/shared/seed.mjs';
+import { pxToLatLng, latLngToPx } from '../web/tiles.mjs';
+import { M_PER_DEG_LAT } from '../web/shared/geo.mjs';
 
 test('nextLives: nad 100 m bere život', () => {
   assert.equal(nextLives(3, 140), 2);
@@ -79,4 +81,19 @@ test('hardcoreViewport: stejný střed jako jinde, ale větší plátno a úhel'
   assert.equal(hc.lng, plain.lng);
   assert.equal(hc.size, VIEW_SIZE * SPAN);
   assert.equal(hc.rot, round.rot);
+});
+
+test('px↔latlng na rotovaném plátně: bod tam a zpátky', () => {
+  const vp = { lat: 50.08, lng: 14.43, size: VIEW_SIZE * SPAN };
+  const [lat, lng] = pxToLatLng(120, 700, vp, 849);
+  const [x, y] = latLngToPx(lat, lng, vp, 849);
+  assert.ok(Math.abs(x - 120) < 0.001, `x = ${x}`);
+  assert.ok(Math.abs(y - 700) < 0.001, `y = ${y}`);
+});
+
+test('px↔latlng: horní hrana plátna leží na jeho půlce, ne na půlce výřezu', () => {
+  const vp = { lat: 50.08, lng: 14.43, size: VIEW_SIZE * SPAN };
+  const [lat] = pxToLatLng(0, 0, vp, 849);
+  const north = (lat - vp.lat) * M_PER_DEG_LAT;
+  assert.ok(Math.abs(north - (VIEW_SIZE * SPAN) / 2) < 1, `hrana je ${north} m od středu, čekáme 424`);
 });
