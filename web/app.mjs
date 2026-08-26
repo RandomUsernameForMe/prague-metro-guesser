@@ -207,8 +207,10 @@ function finishRound(timedOut) {
   const detail = perLine.length > 1
     ? perLine.map(r => `linka ${r.line}: ${Math.round(r.d)} m`).join(' · ')
     : `odchylka ${Math.round(d)} m od skutečné osy`;
+  // pod 15 m je trefa nerozeznatelná od přesné, ale metry hráč chce vidět dál
+  const line = d < 15 ? `stanice je správně · ${detail}` : detail;
   const big = mode === 'hardcore' ? `${Math.round(d)} m` : `+${score}`;
-  showResultCard(wait, station, big, timedOut ? `čas vypršel · ${detail}` : detail, segments);
+  showResultCard(wait, station, big, timedOut ? `čas vypršel · ${line}` : line, segments);
 }
 
 // d = průměrná odchylka, null = propadlé kolo; přepočítá životy a text na kartě
