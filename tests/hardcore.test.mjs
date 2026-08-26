@@ -14,14 +14,14 @@ test('nextLives: nad 69 m bere život', () => {
   assert.equal(nextLives(3, 69), 3, 'přesná 69 ještě neubližuje');
 });
 
-test('nextLives: 20 m a míň vrací život, ale nejvýš na strop', () => {
+test('nextLives: pod 15 m vrací život, ale nejvýš na strop', () => {
   assert.equal(nextLives(1, 9), 2);
-  assert.equal(nextLives(1, 20), 2, 'dvacítka se ještě počítá');
+  assert.equal(nextLives(1, 14.9), 2);
   assert.equal(nextLives(LIVES_MAX, 1), LIVES_MAX);
 });
 
-test('nextLives: mezi 20 a 69 m se nic neděje', () => {
-  assert.equal(nextLives(2, 20.1), 2);
+test('nextLives: mezi 15 a 69 m se nic neděje', () => {
+  assert.equal(nextLives(2, 15), 2, 'přesná patnáctka už život nevrací');
   assert.equal(nextLives(2, 45), 2);
   assert.equal(nextLives(2, 69), 2);
 });

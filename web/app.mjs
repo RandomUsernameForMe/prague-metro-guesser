@@ -662,7 +662,7 @@ const step2 = tab => (tab === 'casual'
 const step3 = tab => (tab === 'hardcore'
   // prahy se táhnou z konstant, ať text nezůstane pozadu, když se pravidlo doladí
   ? `Potvrdíš, mapa se narovná a uvidíš skutečnou osu.<br><span>Odchylka nad ${LOSE_M} m bere život,
-     ${GAIN_M} m a míň ho vrací. Máš ${LIVES_MAX}.</span>`
+     pod ${GAIN_M} m ho vrací. Máš ${LIVES_MAX}.</span>`
   : 'Potvrdíš a uvidíš skutečnou osu kolejí.<br><span>Čím blíž jsi trefil, tím víc bodů — max 1000 za kolo.</span>');
 
 // bez úvodních odstavců — co který režim je, stojí v TAB_META nad kartou

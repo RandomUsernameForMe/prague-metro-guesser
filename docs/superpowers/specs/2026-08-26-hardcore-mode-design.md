@@ -14,8 +14,8 @@ průměr přes obě linky).
 
 | `d` | důsledek |
 |---|---|
-| ≤ 20 m | +1 život, nejvýš na 3 |
-| 20–69 m | nic |
+| < 15 m | +1 život, nejvýš na 3 |
+| 15–69 m | nic |
 | > 69 m | −1 život |
 | vypršel čas nebo chybí úsečka | −1 život |
 
@@ -235,7 +235,7 @@ Obě díry má i dnešní weekly, takže hardcore je nezhoršuje:
 // web/shared/hardcore.mjs
 export const LIVES_MAX = 3;
 export const LOSE_M = 69;    // horší kolo bere život
-export const GAIN_M = 20;    // lepší kolo život vrací, dvacítka se ještě počítá
+export const GAIN_M = 15;    // lepší kolo život vrací
 export const SPAN = Math.SQRT2;  // plátno vs. výřez, ať rotace nekouká do rohů
 export const MAX_ROUNDS = 500;
 
