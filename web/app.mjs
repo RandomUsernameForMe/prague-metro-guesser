@@ -379,6 +379,12 @@ function advance() {
   roundIdx < rounds.length ? startRound() : (mode === 'warmup' ? finishWarmup() : finish());
 }
 
+// prosba o podporu — jen na koncových kartách, ne mezi koly
+const SUPPORT = `
+  <p class="support">Tato hříčka je zdarma, ale stála mě nějaký čas. Jestli vám udělala radost,
+    <a href="https://buymeacoffee.com/guth" target="_blank" rel="noopener">můžete přispět</a> —
+    zvyšuje to šanci, že někdy nějakou zase stvořím.</p>`;
+
 // ---------- konec rozehřátí ----------
 function finishWarmup() {
   const played = localStorage.getItem(playedKey);
@@ -393,6 +399,7 @@ function finishWarmup() {
       : `<button class="btn btn-primary" id="play">Hrát týdenní výzvu na ostro</button>
          <button class="btn btn-outline" id="again">Ještě jednou na nečisto</button>`}
     <button class="link-btn" id="back">← zpět na začátek</button>
+    ${SUPPORT}
   `, () => {
     if (played) $('lb').onclick = () => showLeaderboard(played);
     else $('play').onclick = startWeekly;
@@ -494,6 +501,7 @@ async function showLeaderboard(me) {
     <div id="lb-list"><p>Načítám…</p></div>
     <button class="btn btn-outline" id="train">Casual mode</button>
     <button class="link-btn" id="back">← zpět na začátek</button>
+    ${SUPPORT}
   `, () => {
     $('train').onclick = startCasual;
     $('back').onclick = () => showIntro();
@@ -605,6 +613,7 @@ function endRun() {
     <button class="btn btn-primary" id="submit">Zapsat mezi přeživší</button>
     <button class="btn btn-outline" id="again">Hrát znovu</button>
     <button class="link-btn" id="back">← zpět na začátek</button>
+    ${SUPPORT}
   `, () => {
     $('nick').value = localStorage.getItem('pmg-nick') ?? '';
     $('submit').onclick = submitRun;
