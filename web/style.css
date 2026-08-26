@@ -612,5 +612,6 @@ body[data-mode='hardcore'] .progress li::after { content: none; }
   background: linear-gradient(90deg, #ff4d4d, #ff9f1c, #ffe14d, #4dd06a, #3fa9ff, #a05cff);
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
-/* ostatní režimy v hardcore škrtnuté — existují, ale tenhle run je nemá */
-body[data-mode='hardcore'] .tab { text-decoration: line-through; }
+/* ostatní režimy v hardcore škrtnuté a mrtvé — existují, ale tenhle run je nemá */
+body[data-mode='hardcore'] .tab { text-decoration: line-through; cursor: not-allowed; opacity: 0.45; }
+body[data-mode='hardcore'] .tab:hover { color: var(--muted); }

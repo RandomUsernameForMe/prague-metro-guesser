@@ -666,9 +666,11 @@ const TAB_META = {
 };
 let introTab = 'standard';
 
+// v hardcore jsou ostatní režimy přeškrtnuté a zamčené — ven vede jen tlačítko softcore
 const tabBtn = (id, name) =>
   `<button class="tab ${id}" role="tab" id="tab-${id}" data-tab="${id}"
-     aria-selected="${id === introTab}" tabindex="${id === introTab ? 0 : -1}">${name}</button>`;
+     aria-selected="${id === introTab}" tabindex="${id === introTab ? 0 : -1}"
+     ${introTab === 'hardcore' ? 'disabled' : ''}>${name}</button>`;
 
 // mezi režimy se liší text kroků — casual nemá odpočet, hardcore nemá jméno stanice
 // jak se kreslí říká hint v prvním kole (board.maybeShowHint), tady se to neopakuje
