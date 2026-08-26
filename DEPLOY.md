@@ -11,22 +11,26 @@ a znovu propojit Workers Builds, tak to nedělej pro nic za nic.
 
 ```
 git push
+npx wrangler deploy
 ```
 
-To je celé. Workers Builds nasadí každý push do `main`.
+Obojí. **Push sám nenasazuje.** Workers Builds je odpojený — trigger shodilo
+přejmenování workeru 26. 8. 2026 a zpátky propojený není, takže produkce jede
+z ruky. Kdo pushne a jde od počítače, nechá produkci pozadu a nic mu to neřekne.
 
-**Ověř si, že se to opravdu nasadilo.** Push, který nikam nedojel, se nijak
-neohlásí — 26. 8. 2026 takhle produkce tiše zůstala tři commity pozadu, protože
-přejmenování workeru shodilo build trigger. Nejrychlejší kontrola je stáhnout si
-soubor, který přibyl posledním commitem; 404 znamená, že build neproběhl:
+**Ověř si, že se to opravdu nasadilo.** `wrangler deploy` běžně hlásí
+`No updated asset files to upload` i když se soubory měnily, takže výpis
+příkazu není důkaz. Stáhni si z produkce něco, co přibylo posledním commitem:
 
 ```
-curl -sI https://kdejemetro.guth.workers.dev/og.jpg | head -1
-npx wrangler deployments list | tail -20   # zdroj má být Workers Builds, ne Secret Change
+curl -s https://kdejemetro.guth.workers.dev/app.mjs | grep -c neco_z_posledni_zmeny
+npx wrangler deployments list | tail -20
 ```
 
-Když build nejede, nasadíš ručně přes `npx wrangler deploy` a pak se koukni na
-trigger (Settings → Builds u workeru `kdejemetro`).
+Ve výpisu deploymentů je zdroj `Unknown (deployment)` ruční wrangler,
+`Workers Builds` znamená, že se trigger probral k životu. Až se tak stane,
+`npx wrangler deploy` z běžného dne vypadne a tenhle odstavec s ním.
+Propojení popisuje *Jednorázové nastavení* níž.
 
 ## Když se mění schéma databáze
 
@@ -58,8 +62,9 @@ sám neskončí, takže se čeká na timeout.
 
 Tohle uděláš jednou a už nikdy.
 
-**1. Propojit repo** — v dashboardu Workers & Pages → `prague-metro-guesser` →
-Settings → Builds → Connect → vyber GitHub repo.
+**1. Propojit repo** — v dashboardu Workers & Pages → `kdejemetro` →
+Settings → Builds → Connect → vyber GitHub repo. Momentálně propojené není
+(viz *Běžný den*).
 
 | pole | hodnota |
 |---|---|
@@ -90,8 +95,8 @@ npm run smoke           # duel proti běžícímu dev serveru
 ## Co za tebe nikdo neudělá
 
 - **Preview URL na PR nefungují.** Cloudflare je pro workery s Durable Objects
-  negeneruje, a tenhle worker je má. Buildy na větvích proběhnou, odkaz k
-  proklikání z nich nebude.
+  negeneruje, a tenhle worker je má. I kdyby buildy zase jezdily, odkaz k
+  proklikání z větve nebude.
 - **Migrace v CI.** Token, který si Workers Builds generuje sám, má práva na
   Workers Scripts, KV a R2 — ne na D1. Kdybys migrace přesto chtěl automaticky,
   přidej tokenu právo *D1 (edit)* a nastav deploy command na
