@@ -4,7 +4,7 @@ import { mulberry32, roundViewport, VIEW_SIZE } from './seed.mjs';
 
 export const LIVES_MAX = 3;
 export const LOSE_M = 100;   // horší kolo bere život
-export const GAIN_M = 15;    // lepší kolo život vrací
+export const GAIN_M = 20;    // lepší kolo život vrací, dvacítka se ještě počítá
 export const SPAN = Math.SQRT2;  // plátno vs. výřez, ať pootočený čtverec nekouká do rohů
 export const MAX_ROUNDS = 500;   // strop na velikost payloadu při odeslání runu
 
@@ -27,7 +27,7 @@ export function hardcoreViewport(round) {
 // d = průměrná odchylka kola v metrech; null = propadlé kolo (nestihl všechny úsečky)
 export function nextLives(lives, d) {
   if (d === null || d > LOSE_M) return lives - 1;
-  if (d < GAIN_M) return Math.min(LIVES_MAX, lives + 1);
+  if (d <= GAIN_M) return Math.min(LIVES_MAX, lives + 1);
   return lives;
 }
 
