@@ -7,6 +7,7 @@ import * as exportCsv from './api/export.js';
 import * as adminIndex from './admin/index.js';
 import * as adminStats from './admin/stats.js';
 import * as adminReports from './admin/reports.js';
+import * as adminHeatmap from './admin/heatmap.js';
 import { guard } from './admin/auth.js';
 
 export { MatchDO } from './match-do.js';
@@ -28,6 +29,7 @@ const ADMIN_ROUTES = {
   '/admin/': { GET: adminIndex.onRequestGet },
   '/admin/stats': { GET: adminStats.onRequestGet },
   '/admin/reports': { GET: adminReports.onRequestGet },
+  '/admin/heatmap': { GET: adminHeatmap.onRequestGet },   // ?station=<id>
 };
 
 const MATCH_PATH = /^\/api\/duel\/([ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6})$/;

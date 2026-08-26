@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { esc, int, fix1, pct, secs, den, page } from '../src/admin/layout.js';
+import { heatmapLines, axisLines, parseSegments } from '../src/admin/heatmap-geom.js';
 
 // note z hlášení je jediný neověřený uživatelský vstup, co teče do admin stránky
 test('esc: uživatelský vstup neuteče z HTML', () => {
@@ -37,4 +38,63 @@ test('formátování: běžné hodnoty', () => {
   assert.equal(fix1(198.76), '198,8'); // desetinná čárka, ne tečka
   assert.equal(secs(4681), '4,7 s');
   assert.equal(den('2026-08-21'), '21. 8.');
+});
+
+// ---------- mapa tipů (/admin/heatmap) ----------
+
+const HM_STATION = {
+  id: 'x', name: 'Zkušební', lat: 50, lng: 14.4, lines: ['A'],
+  axes: [{ line: 'A', pts: [[50.0005, 14.4], [49.9995, 14.4]] }],
+};
+const SIZE = 640;
+const row = segs => ({ segments_json: JSON.stringify(segs) });
+
+test('heatmapLines: tip přes střed stanice padne doprostřed rámu', () => {
+  const { lines, outside } = heatmapLines([row([[[50, 14.4], [50.0005, 14.4]]])], HM_STATION, SIZE);
+  assert.equal(outside, 0);
+  assert.equal(lines.length, 1);
+  const [[x1, y1], [, y2]] = lines[0];
+  assert.equal(Math.round(x1), SIZE / 2);
+  assert.equal(Math.round(y1), SIZE / 2);
+  assert.ok(y2 < y1, 'sever je nahoře, takže druhý bod má menší y');
+});
+
+test('heatmapLines: tipy z různých výřezů se skládají do jednoho rámu', () => {
+  // dva hráči viděli stanici jinak posunutou, ale úsečky jsou v lat/lng
+  const { lines } = heatmapLines(
+    [row([[[50, 14.4], [50.0005, 14.4]]]), row([[[50, 14.4], [50.0005, 14.4]]])], HM_STATION, SIZE);
+  assert.equal(lines.length, 2);
+  assert.deepEqual(lines[0], lines[1]);
+});
+
+test('heatmapLines: úsečka mimo výřez se nekreslí, ale spočítá', () => {
+  // 400 m na sever je za hranou 600m rámu vystředěného na stanici
+  const { lines, outside } = heatmapLines([row([[[50.0036, 14.4], [50.0037, 14.4]]])], HM_STATION, SIZE);
+  assert.equal(lines.length, 0);
+  assert.equal(outside, 1);
+});
+
+// řádky z DB tečou do atributů SVG — pokažený řádek nesmí být cesta do stránky
+test('parseSegments: rozbitý řádek nespadne ani neprojde dál', () => {
+  assert.deepEqual(parseSegments('{nevalidní'), []);
+  assert.deepEqual(parseSegments('"řetězec"'), []);
+  assert.deepEqual(parseSegments('null'), []);
+  assert.deepEqual(parseSegments(JSON.stringify([[['1"/><script>', 14.4], [50, 14.4]]])), []);
+  assert.deepEqual(parseSegments(JSON.stringify([[[NaN, 14.4], [50, 14.4]]])), []); // NaN → null v JSON
+  assert.deepEqual(parseSegments(JSON.stringify([[[50, 14.4]]])), []);              // chybí druhý bod
+});
+
+test('heatmapLines: rozbité řádky se přeskočí, zdravé projdou', () => {
+  const { lines, outside } = heatmapLines(
+    [{ segments_json: '{nevalidní' }, row([[[50, 14.4], [50.0005, 14.4]]])], HM_STATION, SIZE);
+  assert.equal(lines.length, 1);
+  assert.equal(outside, 0);
+});
+
+test('axisLines: osa stanice dostane barvu své linky a body v px', () => {
+  const [axis] = axisLines(HM_STATION, SIZE);
+  assert.equal(axis.line, 'A');
+  assert.equal(axis.pts.length, 2);
+  assert.equal(Math.round(axis.pts[0][0]), SIZE / 2);
+  assert.ok(axis.pts[0][1] < axis.pts[1][1]);
 });

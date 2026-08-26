@@ -27,7 +27,10 @@ function stationTable(rows) {
     <th class="num">ø vzdálenost</th><th class="num">propadlo</th><th class="num">ø čas</th></tr>
 ${sorted.map(r => {
     const st = byId.get(r.station_id);
-    const name = st ? esc(st.name) : `<i>neznámá</i> <small>${esc(r.station_id)}</small>`;
+    // jméno vede na mapu tipů; u stanice, co ve stations.json není, není kam odkázat
+    const name = st
+      ? `<a href="/admin/heatmap?station=${encodeURIComponent(r.station_id)}">${esc(st.name)}</a>`
+      : `<i>neznámá</i> <small>${esc(r.station_id)}</small>`;
     const lines = st ? ` <span class="l">${esc(st.lines.join('+'))}</span>` : '';
     return `<tr>
   <td>${name}${lines}</td>
