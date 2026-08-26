@@ -10,20 +10,23 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { layout, latLngToPx } from '../web/tiles.mjs';
+import { layout } from '../web/tiles.mjs';
 
 const web = fileURLToPath(new URL('../web/', import.meta.url));
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
-// stanice pro OG: náměstí Míru je z ptačí perspektivy nezaměnitelné (kostel
-// sv. Ludmily uprostřed radiálního náměstí) a osa vede přes celé náměstí
-const STATION = 'Náměstí Míru';
+// Čtyři stanice do mřížky. Osa nástupiště se nekreslí — OG nesmí prozradit
+// odpověď. Všechny čtyři jsou podzemní: u nadzemních (Vyšehrad, Černý Most) je
+// nástupiště na snímku vidět a otázka „kudy vede pod tím" ztrácí smysl.
+// Jinak vybrané na kontrast textur (jádro, křižovatka, kolejiště, sídliště)
+// a tak, aby padla A i B i C.
+const STATIONS = ['Staroměstská', 'Anděl', 'Hlavní nádraží', 'Háje'];
 const MAP = 630;                       // hrana leteckého čtverce = výška OG
+const GAP = 2, CELL = (MAP - GAP) / 2;
 const OG_W = 1200, OG_H = 630;
 
 const LINE = { A: '#009f4d', B: '#ffd400', C: '#d6001c' };
 const CONCRETE = '#0f1113', TEXT = '#eef1f3', MUTED = '#8c969e', HAIRLINE = '#2c3238';
-const DRAW = '#ff2d6f';                // hráčova čára, stejně jako ve hře
 const ICON_RED = '#c8102e';            // sladěno s web/favicon.svg
 
 const tmp = mkdtempSync(join(tmpdir(), 'pmg-brand-'));
@@ -75,34 +78,26 @@ const face = (name, weight, file, range) =>
 const family = (name, weight, stem) =>
   face(name, weight, `${stem}-latin.woff2`, RANGE.latin) + face(name, weight, `${stem}-latin-ext.woff2`, RANGE.ext);
 
-const station = JSON.parse(readFileSync(join(web, 'stations.json'), 'utf8'))
-  .find(s => s.name === STATION);
-if (!station) throw new Error(`stanice ${STATION} není ve stations.json`);
-
-const vp = { lat: station.lat, lng: station.lng };
-const tiles = layout(vp, MAP)
-  .map(t => `<img src="${t.url}" style="left:${t.left}px;top:${t.top}px;width:${t.w}px;height:${t.h}px">`)
-  .join('');
-
-// skutečná osa nástupiště, tak jak ji hra odhalí po potvrzení tipu
-const axis = station.axes[0];
-const truth = axis.pts.map(([lat, lng]) => latLngToPx(lat, lng, vp, MAP));
-
-// hráčův tip: osa pootočená, protaženou a posunutá — ať je vidět, že se trefil těsně vedle
-const rot = -13 * Math.PI / 180, stretch = 1.18, shift = [14, -34];
-const cx = (truth[0][0] + truth[1][0]) / 2, cy = (truth[0][1] + truth[1][1]) / 2;
-const guess = truth.map(([x, y]) => {
-  const [dx, dy] = [(x - cx) * stretch, (y - cy) * stretch];
-  return [cx + shift[0] + dx * Math.cos(rot) - dy * Math.sin(rot),
-          cy + shift[1] + dx * Math.sin(rot) + dy * Math.cos(rot)];
+const all = JSON.parse(readFileSync(join(web, 'stations.json'), 'utf8'));
+const picked = STATIONS.map(name => {
+  const s = all.find(x => x.name === name);
+  if (!s) throw new Error(`stanice ${name} není ve stations.json`);
+  return s;
 });
-const seg = ([[x1, y1], [x2, y2]]) =>
-  `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${DRAW}" stroke-width="5" stroke-linecap="round"/>
-   <circle cx="${x1}" cy="${y1}" r="6" fill="${DRAW}"/><circle cx="${x2}" cy="${y2}" r="6" fill="${DRAW}"/>`;
 
-const accent = LINE[axis.line];
-const badges = station.lines.map(l =>
-  `<span class="badge" style="background:${LINE[l]};color:${l === 'B' ? '#1a1400' : '#fff'}">${l}</span>`).join('');
+const badge = l =>
+  `<span class="badge" style="background:${LINE[l]};color:${l === 'B' ? '#1a1400' : '#fff'}">${l}</span>`;
+
+const cells = picked.map(s => {
+  const tiles = layout({ lat: s.lat, lng: s.lng }, CELL)
+    .map(t => `<img src="${t.url}" style="left:${t.left}px;top:${t.top}px;width:${t.w}px;height:${t.h}px">`)
+    .join('');
+  return `<div class="cell">${tiles}
+    <span class="label">${s.lines.map(badge).join('')}${s.name}</span>
+  </div>`;
+}).join('');
+
+const accent = LINE.A;
 
 shot(`<meta charset="utf-8"><style>
 ${family('Anton', 400, 'anton')}
@@ -110,9 +105,14 @@ ${family('Archivo', '500 800', 'archivo')}
 *{margin:0;box-sizing:border-box}
 body{width:${OG_W}px;height:${OG_H}px;display:flex;overflow:hidden;
   background:#0e1b17;color:${TEXT};font:600 16px/1.45 Archivo,sans-serif}
-#map{position:relative;width:${MAP}px;height:${MAP}px;flex:none;background:${CONCRETE}}
-#map img{position:absolute;display:block}
-#map svg{position:absolute;inset:0;width:100%;height:100%}
+#map{width:${MAP}px;height:${MAP}px;flex:none;background:${CONCRETE};
+  display:grid;grid-template:repeat(2,1fr)/repeat(2,1fr);gap:${GAP}px}
+.cell{position:relative;overflow:hidden}
+.cell img{position:absolute;display:block}
+.label{position:absolute;left:10px;bottom:10px;display:flex;align-items:center;gap:7px;
+  padding:5px 11px 5px 6px;border-radius:999px;background:rgba(15,17,19,.82);
+  font:700 15px/1 Archivo,sans-serif;letter-spacing:.01em}
+.label .badge{width:22px;height:22px;font-size:14px}
 #panel{flex:1;display:flex;flex-direction:column;gap:30px;padding:44px 42px 36px;
   background:#172624;border-left:1px solid ${HAIRLINE};position:relative}
 #panel::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:${accent}}
@@ -124,24 +124,18 @@ body{width:${OG_W}px;height:${OG_H}px;display:flex;overflow:hidden;
 .badges{display:flex;gap:8px}
 .badge{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;
   font:400 21px/1 Anton,sans-serif}
-h1{font:400 58px/0.98 Anton,sans-serif;letter-spacing:.01em;text-wrap:balance}
-.tagline{font-size:21px;color:${TEXT};opacity:.85;max-width:19ch}
+h1{font:400 62px/0.96 Anton,sans-serif;letter-spacing:.01em;text-wrap:balance}
+.tagline{font-size:21px;color:${TEXT};opacity:.85;max-width:21ch}
 footer{margin-top:auto;display:grid;gap:6px;font-size:14px;color:${MUTED}}
 footer b{color:${TEXT};font:400 17px/1 Anton,sans-serif;letter-spacing:.04em}
 </style>
-<div id="map">${tiles}
-  <svg viewBox="0 0 ${MAP} ${MAP}">
-    ${seg(guess)}
-    <polyline points="${truth.map(p => p.join(',')).join(' ')}" fill="none"
-      stroke="${accent}" stroke-width="6" stroke-linecap="round"/>
-  </svg>
-</div>
+<div id="map">${cells}</div>
 <div id="panel">
   <div class="brand"><span class="brand-mark">M</span><span class="brand-name">Metro<br>Guesser</span></div>
   <div class="task">
-    <span class="badges">${badges}</span>
-    <h1>${STATION}</h1>
-    <p class="tagline">Nakresli, kudy pod tím vede nástupiště.</p>
+    <span class="badges">${['A', 'B', 'C'].map(badge).join('')}</span>
+    <h1>Kudy pod tím vede metro?</h1>
+    <p class="tagline">${all.length} stanic z ptačí perspektivy. Nakresli osu nástupiště — nebo duel 1v1.</p>
   </div>
   <footer><b>kdejemetro.guth.workers.dev</b><span>ortofoto © ČÚZK</span></footer>
 </div>`, 'og.png', OG_W, OG_H, 25000);
