@@ -420,9 +420,13 @@ function finish() {
   });
 }
 
+// „3–16 znaků" hráči s tečkou v přezdívce nic neřekne — hláška musí jmenovat i povolené znaky
+const NICK_HELP = 'Přezdívka smí mít 3–16 znaků: písmena, číslice, mezera, pomlčka a podtržítko.';
+
 async function submitScore() {
   const nick = $('nick').value.trim();
   $('submit-err').textContent = '';
+  $('submit').disabled = true;   // dvojklik na mobilu jinak pošle dva zápisy, druhý spadne na 409
   try {
     const res = await fetch('/api/score', {
       method: 'POST',
@@ -431,13 +435,19 @@ async function submitScore() {
     });
     const data = await res.json();
     if (!res.ok) {
-      $('submit-err').textContent = data.error === 'nick' ? 'Neplatná přezdívka (3–16 znaků)' : data.error;
+      $('submit-err').textContent = res.status === 409
+        ? 'Tuhle přezdívku už tenhle týden někdo použil — zvol jinou.'
+        : data.error === 'nick' ? NICK_HELP
+          : data.error === 'rate limit' ? 'Moc zápisů za sebou — zkus to za chvíli.'
+            : `Zápis se nepovedl (${data.error}) — zkus to znovu.`;
+      $('submit').disabled = false;
       return;
     }
     localStorage.setItem(playedKey, nick);
     showLeaderboard(nick);
   } catch {
     $('submit-err').textContent = 'Odeslání selhalo — zkus znovu';
+    $('submit').disabled = false;
   }
 }
 
