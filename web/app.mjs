@@ -2,6 +2,7 @@ import { isoWeek, weeklyChallenge, practiceRounds, roundViewport } from './share
 import { scoreRound } from './shared/scoring.mjs';
 import * as board from './board.mjs';
 import { initDuel, findOpponent, hostDuel, joinDuel } from './duel.mjs';
+import { hardcoreRound, hardcoreViewport, nextLives, LIVES_MAX, MAX_ROUNDS } from './shared/hardcore.mjs';
 
 const $ = id => document.getElementById(id);
 const overlay = $('overlay');
@@ -28,10 +29,16 @@ const timed = () => mode !== 'casual';
 let rounds = [], roundIdx = 0, totalScore = 0;
 let lines = [];         // tahy pro odeslání, [[[lat,lng],[lat,lng]], ...] per kolo
 
+// hardcore: seed určuje celý run, hcRun se na konci pošle serveru k přepočtu
+let hcSeed = 0, hcRun = [], lives = LIVES_MAX, lostThisRound = false;
+const hcBestKey = 'pmg-hc-best';
+
 const required = () => rounds[roundIdx].station.lines.length;
 const roundSeconds = () => (required() > 1 ? SECONDS.transfer : SECONDS.single);
 
-const vp = () => roundViewport(rounds[roundIdx]);
+const vp = () => (mode === 'hardcore'
+  ? hardcoreViewport(rounds[roundIdx])   // větší plátno + náhodný úhel
+  : roundViewport(rounds[roundIdx]));
 
 // markup níže je vždy statická šablona aplikace + čísla; DOMParser navíc nespouští skripty
 const parseHtml = markup => [...new DOMParser().parseFromString(markup, 'text/html').body.childNodes];
@@ -42,6 +49,10 @@ const ICON = {
   warn: svg('<path d="M12 3 2 21h20L12 3Z"/><path d="M12 10v4.5"/><path d="M12 17.5h.01"/>'),
   link: svg('<path d="M9.5 14.5 14.5 9.5"/><path d="M11 6.5 12.8 4.7a4 4 0 1 1 5.7 5.7l-1.8 1.8"/>'
     + '<path d="M13 17.5l-1.8 1.8a4 4 0 1 1-5.7-5.7l1.8-1.8"/>'),
+  skull: svg('<path d="M12 2c-4.4 0-8 3.4-8 7.6 0 2.6 1.3 4.6 3 5.8V19a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-3.6'
+    + 'c1.7-1.2 3-3.2 3-5.8C20 5.4 16.4 2 12 2Z"/><circle cx="9" cy="10" r="1.7" fill="currentColor" stroke="none"/>'
+    + '<circle cx="15" cy="10" r="1.7" fill="currentColor" stroke="none"/>'
+    + '<path d="M12 13v2"/><path d="M9.5 20v-2.6"/><path d="M14.5 20v-2.6"/>'),
 };
 
 $('home').onclick = () => showIntro();
@@ -57,35 +68,57 @@ function updateTask() {
     return;
   }
   const st = rounds[roundIdx].station;
+  const hc = mode === 'hardcore';
   const where = mode === 'casual' ? 'casual mode'
-    : `${mode === 'warmup' ? 'rozehřátí' : 'kolo'} ${roundIdx + 1} z ${rounds.length}`;
+    : hc ? `hardcore · kolo ${roundIdx + 1}`
+      : `${mode === 'warmup' ? 'rozehřátí' : 'kolo'} ${roundIdx + 1} z ${rounds.length}`;
   const task = st.lines.length > 1
-    ? `přestup ${st.lines.join('+')} · nakresli ${st.lines.length} úsečky (${board.count()}/${st.lines.length})`
+    ? (hc
+      // v hardcore se přiznává jen počet úseček, linky ne
+      ? `nakresli 2 úsečky (${board.count()}/2)`
+      : `přestup ${st.lines.join('+')} · nakresli ${st.lines.length} úsečky (${board.count()}/${st.lines.length})`)
     : 'nakresli osu nástupiště jednou úsečkou';
   $('round-label').textContent = `${where} · ${task}`;
 }
 
+// tři lebky místo teček průběhu; zhaslá = ztracený život
+const skullRow = () => Array.from({ length: LIVES_MAX }, (_, i) => {
+  const li = document.createElement('li');
+  const alive = i < lives;
+  li.className = `life${alive ? '' : ' lost'}${!alive && lostThisRound && i === lives ? ' just-lost' : ''}`;
+  li.append(...parseHtml(ICON.skull));
+  return li;
+});
+
 function paintPanel() {
   const st = rounds[roundIdx].station;
-  document.documentElement.style.setProperty('--accent', `var(--${st.lines[0].toLowerCase()})`);
-  document.documentElement.style.setProperty('--on-accent', st.lines[0] === 'B' ? '#1a1400' : '#fff');
-  setBackdrop(st.name);
-  $('station-name').textContent = st.name;
-  $('line-badges').replaceChildren(...st.lines.map(l => {
+  const hc = mode === 'hardcore';
+  if (!hc) {
+    document.documentElement.style.setProperty('--accent', `var(--${st.lines[0].toLowerCase()})`);
+    document.documentElement.style.setProperty('--on-accent', st.lines[0] === 'B' ? '#1a1400' : '#fff');
+  }
+  setBackdrop(hc ? null : st.name); // fotka podle stanice by ji v hardcore prozradila
+  $('station-name').textContent = hc ? '???' : st.name;
+  $('station-name').classList.toggle('hc-type', hc);
+  $('line-badges').replaceChildren(...(hc ? [] : st.lines.map(l => {
     const b = document.createElement('span');
     b.className = `badge ${l}`;
     b.textContent = l;
     return b;
-  }));
+  })));
   updateTask();
-  $('progress').replaceChildren(...(mode !== 'casual'
-    ? Array.from({ length: rounds.length }, (_, i) => {
-      const li = document.createElement('li');
-      if (i < roundIdx) li.className = 'done';
-      else if (i === roundIdx) li.className = 'now';
-      return li;
-    })
-    : []));
+  $('progress').replaceChildren(...(hc ? skullRow()
+    : mode !== 'casual'
+      ? Array.from({ length: rounds.length }, (_, i) => {
+        const li = document.createElement('li');
+        if (i < roundIdx) li.className = 'done';
+        else if (i === roundIdx) li.className = 'now';
+        return li;
+      })
+      : []));
+  // v hardcore nejsou body, jediné číslo je počet odehraných kol
+  $('score-label').textContent = hc ? 'kola' : 'skóre';
+  if (hc) $('score-value').textContent = String(roundIdx + 1);
   $('home').hidden = mode === 'weekly';
 }
 
@@ -125,15 +158,20 @@ function startRound() {
   roundStartedAt = performance.now();
   reportDraw = null;              // hlášení nikdy nepřežije do dalšího kola
   $('confirm').textContent = 'Potvrdit';
-  board.setRound(vp(), required(), rounds[roundIdx].station.lines);
+  // hardcore nesmí prozradit linky ani pruhem o přestupu
+  board.setRound(vp(), required(), mode === 'hardcore' ? [] : rounds[roundIdx].station.lines);
   paintPanel();
   overlay.hidden = true;
   $('clear').disabled = false;
   document.body.dataset.phase = mode;
   board.maybeShowHint();
   // snímek dalšího kola natáhni dopředu, ať je přepnutí okamžité
-  const next = rounds[roundIdx + 1];
-  if (next) board.prefetch(roundViewport(next));
+  // v hardcore další kolo v rounds ještě není, dá se ale odvodit ze seedu
+  if (mode === 'hardcore') board.prefetch(hardcoreViewport(hardcoreRound(hcSeed, roundIdx + 1, stations)));
+  else {
+    const next = rounds[roundIdx + 1];
+    if (next) board.prefetch(roundViewport(next));
+  }
   if (timed()) board.timerStart(roundSeconds() * 1000, () => finishRound(true));
 }
 
@@ -426,6 +464,16 @@ function startWeekly() {
   startRound();
 }
 
+// hardcore: seed si losuje klient, server z něj celý run zrekonstruuje
+function startHardcore() {
+  mode = 'hardcore';
+  hcSeed = (Math.random() * 2 ** 32) >>> 0;
+  hcRun = []; lives = LIVES_MAX; lostThisRound = false;
+  roundIdx = 0; totalScore = 0;
+  rounds = [hardcoreRound(hcSeed, 0, stations)];
+  startRound();
+}
+
 // ---------- helpers ----------
 function showCard(staticHtml, wire) {
   const card = document.createElement('div');
@@ -475,6 +523,7 @@ const TAB_META = {
   standard: `${ROUNDS} stanic · na čas · zápis do žebříčku`,
   duel: '1v1 · stejná kola · kdo je blíž',
   casual: 'bez času · bez konce · bez zápisu',
+  hardcore: '3 životy · mapa pootočená · bez jména stanice',
 };
 let introTab = 'standard';
 
@@ -482,14 +531,23 @@ const tabBtn = (id, name) =>
   `<button class="tab ${id}" role="tab" id="tab-${id}" data-tab="${id}"
      aria-selected="${id === introTab}" tabindex="${id === introTab ? 0 : -1}">${name}</button>`;
 
-// mezi režimy se liší jen druhý krok — casual nemá odpočet
+// mezi režimy se liší text kroků — casual nemá odpočet, hardcore nemá jméno stanice
 // jak se kreslí říká hint v prvním kole (board.maybeShowHint), tady se to neopakuje
+const step1 = tab => (tab === 'hardcore'
+  ? 'Dostaneš letecký snímek 600 × 600 m — pootočený o náhodný úhel.<br><span>Která stanice to je, se nedozvíš.</span>'
+  : 'Dostaneš letecký snímek 600 × 600 m a jméno stanice.<br><span>Stanice je někde uvnitř, ale pod zemí ji nevidíš.</span>');
 const step2 = tab => (tab === 'casual'
   ? 'Nakresli úsečku, kudy vede nástupiště.'
   : `Za ${SECONDS.single} sekund nakresli úsečku, kudy vede nástupiště.`);
+const step3 = tab => (tab === 'hardcore'
+  ? 'Potvrdíš, mapa se narovná a uvidíš skutečnou osu.<br><span>Odchylka nad 100 m bere život, pod 15 m ho vrací. Máš tři.</span>'
+  : 'Potvrdíš a uvidíš skutečnou osu kolejí.<br><span>Čím blíž jsi trefil, tím víc bodů — max 1000 za kolo.</span>');
 
 // bez úvodních odstavců — co který režim je, stojí v TAB_META nad kartou
 const introCta = (tab, played) => {
+  if (tab === 'hardcore') return `
+    <button class="btn btn-primary" id="hc-play">Hrát hardcore</button>
+    <button class="btn btn-outline" id="hc-lb">Žebříček přeživších</button>`;
   if (tab === 'casual') return `
     <button class="btn btn-primary" id="casual">Hrát casual</button>`;
   if (tab === 'duel') return `
@@ -520,19 +578,22 @@ function showIntro(tab = introTab) {
   $('home').hidden = true;
   $('confirm').disabled = true;
   showCard(`
+    <button class="skull ${introTab === 'hardcore' ? 'on' : ''}" id="go-hc"
+      aria-label="Hardcore mode" title="Hardcore">${ICON.skull}</button>
     <p class="label">pražské metro · týden ${week}</p>
     <h2>Metro Guesser</h2>
     <div class="tabs" role="tablist" aria-label="režim hry">
       ${tabBtn('standard', 'Standard')}${tabBtn('duel', 'Duel')}${tabBtn('casual', 'Casual')}
     </div>
     <ol class="steps">
-      <li><b>1</b><div>Dostaneš letecký snímek 600 × 600 m a jméno stanice.<br><span>Stanice je někde uvnitř, ale pod zemí ji nevidíš.</span></div></li>
+      <li><b>1</b><div>${step1(tab)}</div></li>
       <li><b>2</b><div>${step2(tab)}</div></li>
-      <li><b>3</b><div>Potvrdíš a uvidíš skutečnou osu kolejí.<br><span>Čím blíž jsi trefil, tím víc bodů — max 1000 za kolo.</span></div></li>
+      <li><b>3</b><div>${step3(tab)}</div></li>
     </ol>
     <div class="cta">${introCta(tab, played)}</div>
   `, card => {
     if (switching) card.style.animation = 'none';
+    $('go-hc').onclick = () => showIntro('hardcore');
     card.querySelectorAll('.tab').forEach(t => {
       t.onclick = () => showIntro(t.dataset.tab);
       t.onkeydown = e => {
@@ -543,7 +604,10 @@ function showIntro(tab = introTab) {
         $(`tab-${next}`).focus();
       };
     });
-    if (tab === 'casual') $('casual').onclick = startCasual;
+    if (tab === 'hardcore') {
+      $('hc-play').onclick = startHardcore;
+      $('hc-lb').onclick = () => showSurvivors();
+    } else if (tab === 'casual') $('casual').onclick = startCasual;
     else if (tab === 'duel') {
       $('duel-find').onclick = () => askNick(findOpponent);
       $('duel-host').onclick = () => askNick(hostDuel);
