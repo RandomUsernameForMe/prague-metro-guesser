@@ -410,6 +410,17 @@ body[data-phase='casual'] #controls { margin-top: auto; }
 }
 #hint[hidden] { display: none; }
 
+/* návrat z prohlížení odhalené osy — leží nad mapou, karta je zatím schovaná */
+#peek-back {
+  position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%);
+  z-index: 8;
+  box-shadow: 0 12px 30px -12px #000;
+  animation: fade 0.3s var(--ease);
+}
+#peek-back:hover { transform: translate(-50%, -2px); }
+#peek-back:active { transform: translateX(-50%); }
+#peek-back[hidden] { display: none; }
+
 /* Sedí ve stejné grid buňce jako mapa, u jejího spodního okraje.
    z-index 11 = nad overlay, licence fotek musí být vidět. */
 #attribution {

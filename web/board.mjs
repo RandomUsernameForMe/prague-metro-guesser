@@ -94,7 +94,8 @@ function commitSegment(a, b) {
 }
 
 svg.addEventListener('pointerdown', e => {
-  if (!overlay.hidden) return;
+  // revealed = kolo dohráno; při prohlížení osy je overlay schovaný, ale kreslit se nesmí
+  if (!overlay.hidden || revealed) return;
   hideHint(true);
   svg.setPointerCapture(e.pointerId);
   const p = [e.offsetX, e.offsetY];

@@ -184,13 +184,24 @@ function renderResult(station, big, detail, segments) {
     <p>${detail}</p>
     <button class="btn btn-primary" id="next">${nextLabel()}</button>
     <button class="btn btn-outline" id="report">${ICON.warn}Stanice je zadaná špatně</button>
+    <button class="link-btn" id="peek">prohlédnout mapu →</button>
     ${mode === 'casual' ? '<button class="link-btn" id="back">← zpět na začátek</button>' : ''}
   `, card => {
     card.querySelector('h2').textContent = station.name;
     $('next').onclick = advance;
     if (mode === 'casual') $('back').onclick = () => showIntro();
     $('report').onclick = () => showReportCard({ station, big, detail, segments });
+    $('peek').onclick = () => peekMap(() => renderResult(station, big, detail, segments));
   });
+}
+
+// Karta zmizí, ať je odhalená osa vidět celá. Kreslit se přitom nedá — board
+// drží revealed. Zpátky se vykreslí ta samá karta.
+function peekMap(back) {
+  overlay.hidden = true;
+  const btn = $('peek-back');
+  btn.hidden = false;
+  btn.onclick = back;
 }
 
 // ---------- hlášení chybné stanice ----------
@@ -422,6 +433,7 @@ function showCard(staticHtml, wire) {
   card.append(...parseHtml(staticHtml));
   overlay.replaceChildren(card);
   overlay.hidden = false;
+  $('peek-back').hidden = true;   // ať prohlížení nepřežije do jiné karty (třeba ← zpět na začátek)
   board.hideHint();
   board.timerStop(); // odpočet nikdy neběží pod otevřenou kartou
   // overlay kryje jen mapu — tlačítka v panelu se musí zamknout ručně
