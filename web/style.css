@@ -37,6 +37,18 @@
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
+/* Nosifer (SIL Open Font License) — jen hardcore nadpisy. Latin only, proto se
+   sází výhradně na řetězce bez diakritiky, které si řídí kód (HARDCORE, ???,
+   číslo kol, KONEC, +1/-1). Zbytek vět jede v Archivu, s háčky. */
+@font-face {
+  font-family: 'Nosifer';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(fonts/nosifer-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF;
+}
+
 :root {
   --panel-w: 360px;
   --map-h: min(100dvh, calc(100vw - var(--panel-w))); /* mapa je čtverec, tohle je i její šířka */
@@ -510,3 +522,84 @@ body[data-phase='casual'] #controls { margin-top: auto; }
 @media (prefers-reduced-motion: reduce) { #duel-shot { animation: none; } }
 
 #duel-link { font-size: 13px; text-align: center; }
+
+/* ---------- hardcore: šedý svět, jediná barva je krev ---------- */
+/* Ortofoto zůstává barevné schválně — greyscale by hráči ubral informaci
+   a režim by se tím ztížil nad rámec zadání. Šedne jen UI a kulisa. */
+:root { --blood: #c1121f; --bone: #e8e4dc; }
+
+/* Paleta se přepisuje proměnnými, ne filter: grayscale() na panelu — filtr by
+   založil containing block a rozbil backdrop-filter matného skla.
+   Platí i za hry: data-mode nastavuje úvod a startHardcore ho nepřepisuje. */
+body[data-mode='hardcore'] {
+  --mode: #6b7075; --on-mode: #fff;
+  --accent: #6b7075; --on-accent: #fff;
+  --a: var(--bone); --b: var(--bone); --c: var(--bone);
+  --draw: var(--blood);
+  --concrete: #0c0d0e; --alu: #17191b; --alu-hi: #202325;
+  --hairline: #33383c; --muted: #8b8f93;
+}
+/* fotka obkladu je kulisa, ne podklad ke hraní */
+body[data-mode='hardcore'] #bg div { filter: grayscale(1) brightness(0.35); }
+/* urgentní odpočet musí zůstat krvavý, i když --c zbělelo */
+body[data-mode='hardcore'] .clock.urgent strong { color: var(--blood); }
+body[data-mode='hardcore'] #timebar.urgent span { background: var(--blood); }
+
+.hc-type { font-family: Nosifer, Anton, sans-serif; letter-spacing: 0.02em; }
+#station-name.hc-type { font-size: clamp(26px, 3vw, 38px); line-height: 1.3; }
+.card h2.hc-type { line-height: 1.35; }
+.card .big.hc-type { font-size: 52px; line-height: 1.3; color: var(--bone); }
+
+/* zrno a scanline — přes panel a karty, vědomě ne přes snímek */
+body[data-mode='hardcore'] #panel {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.25'/%3E%3C/svg%3E"),
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.25) 0 1px, transparent 1px 3px);
+}
+body[data-mode='hardcore'] .card::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.25'/%3E%3C/svg%3E"),
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px);
+  opacity: 0.55;
+}
+
+/* velká lebka jako vodoznak v pozadí panelu */
+body[data-mode='hardcore'] #panel::after {
+  content: ''; position: absolute; right: -40px; bottom: -30px;
+  width: 300px; height: 300px; pointer-events: none; z-index: 0;
+  opacity: 0.05;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='1.4'%3E%3Cpath d='M12 2c-4.4 0-8 3.4-8 7.6 0 2.6 1.3 4.6 3 5.8V19a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-3.6c1.7-1.2 3-3.2 3-5.8C20 5.4 16.4 2 12 2Z'/%3E%3Ccircle cx='9' cy='10' r='1.7' fill='%23ffffff'/%3E%3Ccircle cx='15' cy='10' r='1.7' fill='%23ffffff'/%3E%3Cpath d='M12 13v2M9.5 20v-2.6M14.5 20v-2.6'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+body[data-mode='hardcore'] #panel > * { position: relative; z-index: 1; }
+
+/* tři lebky místo teček průběhu */
+body[data-mode='hardcore'] .progress { gap: 12px; padding: 4px 0; }
+body[data-mode='hardcore'] .progress li { flex: none; height: auto; background: none; }
+body[data-mode='hardcore'] .progress li::after { content: none; }
+.progress li.life svg { width: 30px; height: 30px; color: var(--bone); }
+.progress li.life.lost svg { color: #3a3e41; }
+.progress li.just-lost { animation: skull-shake 0.5s var(--ease); }
+@keyframes skull-shake {
+  25% { transform: translateX(-4px) rotate(-9deg); }
+  75% { transform: translateX(4px) rotate(9deg); }
+}
+
+/* poznámka o životě na výsledkové kartě */
+.life-note { font: 600 15px/1 Archivo, sans-serif; letter-spacing: 0.1em; text-transform: uppercase; }
+.life-note .hc-type { font-size: 22px; margin-right: 6px; vertical-align: -2px; }
+.life-note.lost { color: var(--blood); }
+.life-note.gained { color: var(--bone); }
+
+/* vstup do režimu: lebka v rohu úvodní karty, mimo řadu tabů */
+.card { position: relative; }
+.skull {
+  position: absolute; top: 10px; right: 10px;
+  width: 38px; height: 38px; display: grid; place-items: center;
+  border: 1px solid var(--hairline); background: #101315; color: #6b7075;
+  cursor: pointer;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease), background 0.2s var(--ease);
+}
+.skull svg { width: 22px; height: 22px; }
+.skull:hover { color: #e8e4dc; border-color: #6b7075; }
+.skull.on { color: #e8e4dc; border-color: #6b7075; background: #1b1e20; }
