@@ -212,6 +212,8 @@ function takeLife(d) {
   lives = nextLives(lives, d);
   lostThisRound = lives < before;
   lifeNote = LIFE_NOTE[lives < before ? 'lost' : lives > before ? 'gained' : 'held'];
+  // lebky překresli hned, ne až s dalším kolem — jinak karta hlásí ztrátu a panel drží tři
+  $('progress').replaceChildren(...skullRow());
 }
 
 // vypršel čas a chybí úsečka → 0 bodů, ale osu ukaž (hráč se má co naučit)
