@@ -24,6 +24,10 @@ const STATIONS = ['Staroměstská', 'Anděl', 'Hlavní nádraží', 'Háje'];
 const MAP = 630;                       // hrana leteckého čtverce = výška OG
 const GAP = 2, CELL = (MAP - GAP) / 2;
 const OG_W = 1200, OG_H = 630;
+// Kreslí se na 1200×630 CSS px, rasterizuje na 2×. Dlaždice ze z18 pokrývají
+// 600 m v ~1560 px, takže i na 2400×1260 se pořád zmenšuje — je to skutečný
+// detail navíc, ne roztažený obrázek. Sdílecí náhledy jsou dnes na retinách.
+const OG_DSF = 2;
 
 const LINE = { A: '#009f4d', B: '#ffd400', C: '#d6001c' };
 const CONCRETE = '#0f1113', TEXT = '#eef1f3', MUTED = '#8c969e', HAIRLINE = '#2c3238';
@@ -33,7 +37,7 @@ const tmp = mkdtempSync(join(tmpdir(), 'pmg-brand-'));
 
 // Chrome 151 v novém headless snímek zapíše, ale sám neskončí. Necháme ho tedy
 // doběhnout do timeoutu a úspěch poznáme podle toho, že PNG na disku je.
-const shot = (html, out, w, h, waitMs) => {
+const shot = (html, out, w, h, waitMs, dsf = 1) => {
   const page = join(tmp, 'page.html');
   const dest = join(web, out);
   writeFileSync(page, html);
@@ -43,13 +47,13 @@ const shot = (html, out, w, h, waitMs) => {
     `--user-data-dir=${join(tmp, 'profile')}`,   // ať to nekoliduje s běžícím Chromem
     '--no-first-run', '--no-default-browser-check',
     '--disable-background-networking', '--disable-component-update',
-    '--force-device-scale-factor=1',
+    `--force-device-scale-factor=${dsf}`,
     `--window-size=${w},${h}`,
     `--screenshot=${dest}`,
     `file://${page}`,
   ], { stdio: 'ignore', timeout: waitMs, killSignal: 'SIGKILL' });
   if (!existsSync(dest)) throw new Error(`Chrome nevyrobil ${out}`);
-  console.log(`${out}  ${w}×${h}  ${(statSync(dest).size / 1024).toFixed(0)} kB`);
+  console.log(`${out}  ${w * dsf}×${h * dsf}  ${(statSync(dest).size / 1024).toFixed(0)} kB`);
 };
 
 // OG obrázek je ze tří čtvrtin letecká fotka, PNG na něj sedne přes 800 kB.
@@ -138,8 +142,8 @@ footer b{color:${TEXT};font:400 17px/1 Anton,sans-serif;letter-spacing:.04em}
     <p class="tagline">${all.length} stanic z ptačí perspektivy. Nakresli osu nástupiště — nebo duel 1v1.</p>
   </div>
   <footer><b>kdejemetro.guth.workers.dev</b><span>ortofoto © ČÚZK</span></footer>
-</div>`, 'og.png', OG_W, OG_H, 25000);
-toJpeg('og.png', 'og.jpg', 78);
+</div>`, 'og.png', OG_W, OG_H, 25000, OG_DSF);
+toJpeg('og.png', 'og.jpg', 72);
 
 // ---------- ikony ----------
 
