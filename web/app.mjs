@@ -79,6 +79,10 @@ function nudgeSupport() {
 setSupport(false);
 $('support-toggle').append(...parseHtml(ICON.coffee));
 $('support-toggle').onclick = () => setSupport(document.body.dataset.support !== 'open');
+// klik mimo lištu ji zavře (na toggle nereaguje, ten si stav přehodí sám)
+document.addEventListener('pointerdown', e => {
+  if (!$('support').contains(e.target)) setSupport(false);
+});
 
 // ---------- panel ----------
 // zadání kola + kolik úseček ještě chybí
