@@ -1,5 +1,7 @@
 # Kde je metro? — Prague Metro Guesser
 
+![Screenshot](docs/screenshot.png)
+
 Where does the Prague metro actually run? You get an aerial photo of a piece of Prague and a station name, and you draw the line where you think the platform lies underground. The closer your line is to the real track axis, the more points you get.
 
 **Play:** <https://kdejemetro.guth.workers.dev>
